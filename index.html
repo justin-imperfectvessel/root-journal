@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-10-27 21:23";</script>
+<script>window.APP_BUILD = "2026-10-27 22:40";</script>
 <title>SIBO Root Journal</title>
 <meta name="description" content="Daily SIBO/IMO journal with tap-to-log checkboxes, FoodMarble tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -340,6 +340,13 @@ svg .bsdot.b1, svg .bsdot.b2 { fill: var(--ink); } svg .bsdot.b3, svg .bsdot.b4 
 .why-row { align-items: baseline; }
 .src { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; min-width: 4.8em; flex: none; }
 .why-row .row-label { font-size: 16px; }
+.insight-row .row-label { font-weight: 700; }
+.insight-row .row-sub { -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.conf { font-weight: 800; color: var(--ink); }
+.tagline .conf { font-size: 13px; padding: 2px 10px; border-radius: 999px; border: var(--line-thin) solid var(--ink); }
+.conf.high { color: var(--good); border-color: currentColor; } .conf.low { opacity: .7; }
+.week-line .row-label { font-size: 17px; }
+.test-group .btn { width: 100%; }
 
 /* history & research */
 .q-row { flex-direction: column; align-items: stretch; gap: 9px; padding-top: 13px; padding-bottom: 13px; }
@@ -488,6 +495,7 @@ input.filled { background: var(--pop) !important; border-radius: 6px; padding: 2
 <script src="vault.js"></script>
 <script src="parser.js"></script>
 <script src="ui.js"></script>
+<script src="insights.js"></script>
 <script src="results.js"></script>
 <script src="voice.js"></script>
 

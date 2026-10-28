@@ -75,6 +75,7 @@ function pageTitle(p) {
   if (!p) return (TABS.find(t => t[0] === UI.tab) || [])[1] || "";
   if (p.k === "driver") { const d = DRIVERS.find(x => x.id === p.id); return d ? d.name : ""; }
   if (p.k === "tx") return PROTOCOLS[p.i] ? PROTOCOLS[p.i].name : "";
+  if (p.k === "insight") return "Insight";
   return { history: "History & labs", research: "Research library", data: "Data & backup", reminder: "Daily reminder", nosignal: "No signal yet", color: "Color", results: "Test results", layout: "Layout check" }[p.k] || "";
 }
 
@@ -99,7 +100,7 @@ function render() {
   const v = $("#view");
   if (UI.loading) { v.innerHTML = `<div class="loading"><span class="spinner"></span></div>`; return; }
   let html;
-  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, nosignal: viewNoSignal })[p.k](p);
+  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, nosignal: viewNoSignal, insight: viewInsight })[p.k](p);
   else html = ({ today: viewToday, trends: viewTrends, protocols: viewProtocols, insights: viewInsights, more: viewMore })[UI.tab]();
   v.innerHTML = (Store.mode === "demo" && !p ? `<div class="demo-pill"><span>Sample data · nothing is saved</span><button type="button" class="textbtn" data-act="exitDemo">Exit</button></div>` : "") + html;
   if (UI.tab === "insights" && !p && UI.aiText) paintAI();
@@ -343,7 +344,8 @@ function viewProtocols() {
         ${[["Before", s.base], ["During", s.during], ["Last 7d", s.late], ["After", s.after]].map(([k, v]) => `<div><span class="cmp-k">${k}</span><span class="cmp-v">${r1(v.mean)}</span><span class="cmp-n">${v.n}d</span></div>`).join("")}
         <div><span class="cmp-k">Adherence</span><span class="cmp-v">${s.adherence == null ? "–" : Math.round(s.adherence * 100) + "%"}</span><span class="cmp-n">all items</span></div>
       </div>
-      <div class="row verdict ${tone}"><span class="row-label">${esc(s.verdict)}</span></div>
+      ${p.experiment ? (() => { const r = experimentResult(p); return `<div class="row verdict ${r.verdict === "helped" ? "good" : r.verdict === "worse" ? "bad" : ""}"><span class="row-label">Test: ${esc(r.text)}</span></div>` + navRow({ label: "See the insight it's testing", sub: esc(p.experiment.title || ""), act: "push", attrs: `data-k="insight" data-id="${esc(p.experiment.insight)}"` }); })()
+        : `<div class="row verdict ${tone}"><span class="row-label">${esc(s.verdict)}</span></div>`}
       ${p.notes ? `<div class="row"><span class="row-sub">${esc(p.notes)}</span></div>` : ""}
     </div></section>`;
   }
@@ -351,47 +353,6 @@ function viewProtocols() {
 }
 
 // ---------- Insights ----------
-function viewInsights() {
-  const A = analyze(), ranked = scoreDrivers(A.F);
-  const answered = INTAKE.filter(q => S.profile.intake[q.k]).length, T = thresholds();
-  const top = ranked.filter(r => r.pts > 0), rest = ranked.filter(r => r.pts <= 0);
-  let h = largeTitle("Insights", `From ${answered} of ${INTAKE.length} history answers and ${A.days.length} journal day${A.days.length === 1 ? "" : "s"}`);
-  if (answered < 15) h += group("", navRow({ label: "Answer your health history", sub: "Many drivers depend on it. Takes about 10 minutes.", value: `${answered}/${INTAKE.length}`, act: "push", attrs: `data-k="history"`, cls: "accent-row" }));
-
-  // drivers
-  h += group("Likely drivers", top.length ? top.map(r => `<button type="button" class="row nav driver-row lvl-${r.level}" data-act="push" data-k="driver" data-id="${r.d.id}">
-      <span class="meter" aria-hidden="true"><i style="height:${Math.max(8, clamp(r.pts / 8) * 100)}%"></i></span>
-      <span class="row-main"><span class="row-label">${esc(r.d.name)}</span><span class="row-sub"><span class="lvl">${LEVEL_LABEL[r.level]}</span> · ${esc(r.d.cat)} ${gasTags(r.d.gas)}</span></span>${icon("chevR", "chev")}</button>`).join("")
-    : `<div class="row"><span class="row-sub">No drivers have signals yet. Answer your history and log for a week or two.</span></div>`,
-    "This points you to questions for a clinician. It isn't a diagnosis.");
-  if (rest.length) h += group("", navRow({ label: `${rest.length} drivers with no signal yet`, act: "push", attrs: `data-k="nosignal"` }));
-
-  // breath
-  const B = A.breathSummary;
-  if (!B) h += group("Breath pattern", `<div class="row"><span class="row-sub">Log at least 3 FoodMarble readings. A fasting reading plus readings 30, 60 and 90 minutes after a meal is the most useful set.</span></div>`);
-  else {
-    const dom = B.pctC >= 0.4 ? "Methane-dominant (IMO pattern)" : B.early != null && B.early >= 0.4 ? "Early hydrogen rise (SIBO pattern)" : B.flat != null && B.flat >= 0.4 ? "Flat line on bad days (possible hydrogen sulfide)" : B.pctH >= 0.4 ? "Hydrogen often elevated" : "No dominant pattern yet";
-    h += group("Breath pattern", `<div class="row"><span class="row-label strong">${dom}</span></div>
-      <div class="row gas-tiles"><div class="gt h2"><span class="cmp-k">H₂ avg / peak</span><span class="cmp-v">${r1(B.avgH)} / ${r1(B.maxH)}</span><span class="cmp-n">${Math.round(B.pctH * 100)}% at or over ${T.h2}</span></div>
-        <div class="gt ch4"><span class="cmp-k">CH₄ avg / peak</span><span class="cmp-v">${r1(B.avgC)} / ${r1(B.maxC)}</span><span class="cmp-n">${Math.round(B.pctC * 100)}% at or over ${T.ch4}</span></div></div>`,
-      `${B.n} readings over ${B.days} days.${B.early != null ? ` Early H₂ rise on ${Math.round(B.early * 100)}% of after-meal tests.` : ""} A home device is a guide, not a lab test.`);
-  }
-
-  // triggers
-  const trig = A.correlations.filter(c => c.lift >= 0.7).slice(0, 5);
-  const help = A.correlations.filter(c => c.lift <= -0.7).sort((a, b) => a.lift - b.lift).slice(0, 5);
-  const liftRow = (c, cls) => `<div class="row lift-row"><span class="row-label">${esc(c.it.name)}</span><span class="liftbar ${cls}"><i style="width:${clamp(Math.abs(c.lift) / 4) * 100}%"></i></span><span class="lift-v ${cls}">${c.lift > 0 ? "+" : ""}${r1(c.lift)}</span></div>`;
-  if (!A.correlations.length) h += group("Patterns in your days", `<div class="row"><span class="row-sub">After about 2 weeks, items that show up before your worse or better days appear here.</span></div>`);
-  else {
-    h += group("Before worse days", trig.map(c => liftRow(c, "bad")).join("") || `<div class="row"><span class="row-sub">Nothing stands out yet</span></div>`);
-    h += group("Before better days", help.map(c => liftRow(c, "good")).join("") || `<div class="row"><span class="row-sub">Nothing stands out yet</span></div>`,
-      "Change in day score (same day and next) when an item is logged vs not. Items taken together, like a whole protocol, move together.");
-  }
-  if (Store.sample) h += group("Ask Claude", `<div class="row ai-row"><span class="row-sub">Sends a summary of your history, rankings, breath pattern and protocol results, and asks for a plain-language read plus questions for your clinician.</span>
-      <button type="button" class="btn filled" data-act="askAI" ${UI.aiBusy ? "disabled" : ""}>${icon("spark")}${UI.aiBusy ? "Reading your journal…" : UI.aiText ? "Ask again" : "Read my journal"}</button>
-      <div id="aiout" class="aiout" ${UI.aiText ? "" : "hidden"}></div></div>`);
-  return h;
-}
 function viewNoSignal() {
   const A = analyze(), rest = scoreDrivers(A.F).filter(r => r.pts <= 0);
   return `<div class="spacer"></div>` + group("", rest.map(r => navRow({ label: esc(r.d.name), sub: r.unknown.length ? `${r.unknown.length} signal${r.unknown.length > 1 ? "s" : ""} not answered yet` : "No specific signals", act: "push", attrs: `data-k="driver" data-id="${r.d.id}"` })).join(""));
@@ -530,7 +491,7 @@ function renderSheet() {
       <label class="row field-row" for="pf-end"><span class="row-label">Ends</span><input id="pf-end" type="date" name="end" value="${esc(ed.end || "")}"></label></div>
       <h3 class="sheet-h3">Daily checklist items</h3>
       <div class="list">${groups.map(g => `<div class="row chips-row"><span class="row-sub">${g.c.name}</span><div class="chips">${g.items.map(i => `<label class="chip ${ed.itemIds.includes(i.id) ? "on" : ""}"><input type="checkbox" class="sr" name="items" value="${i.id}" ${ed.itemIds.includes(i.id) ? "checked" : ""}>${icon("check", "chk")}${esc(i.name)}</label>`).join("")}</div></div>`).join("")}
-        <div class="row add-row"><input id="pf-newitem" name="newitem" placeholder="New items, separated by commas" autocomplete="off"><select id="pf-newcat" name="newcat" aria-label="Category for new items">${CATS.map(c => `<option value="${c.k}" ${c.k === "supp" ? "selected" : ""}>${c.name}</option>`).join("")}</select></div></div>
+        <div class="row add-row"><input id="pf-newitem" name="newitem" placeholder="New items, separated by commas" autocomplete="off" value="${esc(ed.newitem || "")}"><select id="pf-newcat" name="newcat" aria-label="Category for new items">${CATS.map(c => `<option value="${c.k}" ${c.k === (ed.newcat || "supp") ? "selected" : ""}>${c.name}</option>`).join("")}</select></div></div>
       <div class="list"><div class="row"><textarea id="pf-notes" name="notes" rows="3" placeholder="Notes: dosing plan, who prescribed it, what you're testing">${esc(ed.notes || "")}</textarea></div></div>`;
   } else if (s.k === "menu") {
     form = false;
@@ -724,6 +685,7 @@ function submitSheet(fd) {
     const ids = fd.getAll("items");
     String(fd.get("newitem") || "").split(",").map(x => x.trim()).filter(Boolean).forEach(n => { const it = addLibraryItem(n, fd.get("newcat")); if (!ids.includes(it.id)) ids.push(it.id); });
     const p = { id: s.ed.id || newId(), name: String(fd.get("name")).trim(), kind: fd.get("kind"), start: fd.get("start"), end: fd.get("end") || "", itemIds: ids, notes: String(fd.get("notes") || "") };
+    if (s.ed.experiment) p.experiment = s.ed.experiment;
     if (p.end && p.end < p.start) { toast("The end date is before the start date"); return; }
     const i = S.profile.protocols.findIndex(x => x.id === p.id);
     if (i >= 0) S.profile.protocols[i] = p; else S.profile.protocols.push(p);
@@ -747,6 +709,7 @@ function aiSummary() {
     topDrivers: ranked.map(r => ({ name: r.d.name, match: LEVEL_LABEL[r.level], points: Math.round(r.pts * 10) / 10, evidence: r.why.map(w => w.label) })),
     beforeWorseDays: A.correlations.filter(c => c.lift >= 0.7).slice(0, 6).map(c => `${c.it.name} (+${r1(c.lift)})`),
     beforeBetterDays: A.correlations.filter(c => c.lift <= -0.7).slice(-6).map(c => `${c.it.name} (${r1(c.lift)})`),
+    insights: buildInsights().list.filter(x => x.kind !== "gap").slice(0, 8).map(x => ({ finding: x.title, type: x.kind, confidence: x.conf || "", evidence: x.evidence.map(e => e[1]), test: x.result ? x.result.text : undefined })),
     protocols: A.protoStats.map(({ p, s }) => ({ name: p.name, type: p.kind, start: p.start, end: p.end || "ongoing", items: p.itemIds.map(id => A.map[id] && A.map[id].name).filter(Boolean), before: r1(s.base.mean), during: r1(s.during.mean), last7: r1(s.late.mean), after: r1(s.after.mean), verdict: s.verdict })),
   };
 }
