@@ -22,6 +22,7 @@
     t = t.replace(/\b(\d+)\s+and\s+(?:a\s+)?half\b/g, (m, n) => `${n}.5`).replace(/\bhalf an hour\b/g, "0.5 hours").replace(/\ban hour\b/g, "1 hour");
     t = t.replace(/\btwice\b/g, "2 times").replace(/\bonce\b/g, "1 times").replace(/\bthree times\b/g, "3 times");
     t = t.replace(/\b(\d+)\s*(?:out of|outta|\/)\s*10\b/g, "$1");
+    t = t.replace(/\b(?:[b-hj-z]\.?\s){2,}[a-z]\b\.?/g, m => m.replace(/[\s.]/g, "") + " "); // "p h g g" -> "phgg"
     t = t.replace(/\bb\.?m\.?s\b/g, "bms").replace(/\bb\.\s?m\.?\b/g, "bm").replace(/\bc\s?h\s?4\b/g, "ch4").replace(/\bh\s?2\s?s\b/g, "h2s");
     return t;
   }
@@ -63,20 +64,39 @@
   const SEVERITY = [[/\b(no|zero|none|not|without)\b/, 0], [/\b(barely|hardly|tiny bit)\b/, 1], [/\b(mild|slight(?:ly)?|a (?:little|bit)|bit of|minor)\b/, 3],
     [/\b(some|moderate|medium|noticeable)\b/, 5], [/\b(bad|pretty bad|strong|quite|a lot)\b/, 7], [/\b(severe|terrible|awful|horrible|really bad|so bad|unbearable|worst)\b/, 9]];
 
-  function aliasesFor(name) {
+  function aliasesFor(name, cat) {
     const n = name.toLowerCase().trim(), out = new Set([n]);
     const noParen = n.replace(/\s*\(.*?\)\s*/g, " ").trim(); if (noParen) out.add(noParen);
     (n.match(/\(([^)]+)\)/g) || []).forEach(p => out.add(p.slice(1, -1).trim()));
-    n.split(/\s*(?:\+|&|\/)\s*/).forEach(p => { if (p.length >= 4) out.add(p.trim()); });
+    // "&" and "+" are said as "and" or "plus"
+    [...out].forEach(x => { if (/[&+]/.test(x)) { out.add(x.replace(/\s*[&+]\s*/g, " and ")); out.add(x.replace(/\s*[&+]\s*/g, " plus ")); } });
+    // "Ginger + artichoke" can be said as either part; a dish like "Chicken & rice" can't
+    if (cat !== "food") n.split(/\s*(?:\+|&|\/)\s*/).forEach(p => { if (p.length >= 4) out.add(p.trim()); });
     return [...out].filter(a => a.length >= 3);
   }
   const NEGATE = /\b(didn't|did not|didnt|no|skipped|skip|without|forgot|missed|not|avoided|stopped|none of)\b(?:\s+\w+){0,3}\s*$/;
 
   // Words that end a food or supplement list, and words that are never an item.
   const LIST_END = /\b(for (?:breakfast|lunch|dinner|a snack)|at|around|about|by|but|because|which|that|so|after|before|this|today|tonight|this morning|this afternoon|this evening|last night|yesterday|in the|felt|feeling|and felt|it|which made|was|were)\b|[.;!?]/;
-  const NOT_ITEM = /^(it|that|this|them|some|nothing|a lot|lots|much|food|stuff|something|anything|everything|breakfast|lunch|dinner|snack|snacks|meal|meals|a meal|my meal|my supplements|my meds|supplements|meds|medication|bm|a bm|bms|sleep|stress|pain|gas|bloating|period|my period|\d+.*|fun|time|day|enough|a good day|a bad day|a rough day|a great day)$/;
+  const NOT_ITEM = /^(it|that|this|them|the|a|an|my|your|some|nothing|a lot|lots|much|food|stuff|something|anything|everything|breakfast|lunch|dinner|snack|snacks|meal|meals|a meal|my meal|my supplements|my meds|supplements|meds|medication|bm|a bm|bms|sleep|stress|pain|gas|bloating|period|my period|\d+.*|fun|time|day|enough|a good day|a bad day|a rough day|a great day)$/;
   const CLEAN = /^(?:(?:a|an|the|some|my|of|more|another|bit of|little|small|large|big|bowl of|cup of|cups of|glass of|slice of|slices of|piece of|pieces of|handful of|plate of|serving of|scoop of|few|couple(?: of)?|\d+(?:\.\d+)?|half|extra)\s+)+/;
   const DOSE = /(\d+(?:\.\d+)?)\s?(mg|mcg|µg|g|grams?|iu|ml|caps?|capsules?|tablets?|tabs?|pills?|drops?|scoops?|tsp|tbsp)\b/;
+
+  // Near-miss matching for names speech-to-text gets slightly wrong ("allison" for allicin, "phg" for PHGG).
+  // Compares rough sound-alike keys and allows about one wrong letter per four.
+  const COMMON = new Set(("about after again also always and another around back because been before being both breakfast but came come could day did dinner does done down each even every feel felt few first for from gave get good got great had has have having here how into just know last later like little lunch made make many maybe more morning most much night not now off once only other our out over really right same said see should since slept some still such take than that the their them then there these they thing think this those time today took very want was way well went were what when where which while who will with would yeah yes you your pretty kind sort felt feeling stomach gut belly also around").split(" "));
+  const SYM_ANY = new RegExp(`^(?:${Object.values({ bloating: "bloat(?:ing|ed)?", f: "fog(?:gy)?|brain fog", g: "gas(?:sy)?", p: "pain|cramps?|ache" }).join("|")})$`);
+  const soundKey = s => s.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/ph/g, "f").replace(/c(?=[eiy])/g, "s").replace(/ck|c|q/g, "k").replace(/z/g, "s").replace(/y/g, "i").replace(/(.)\1+/g, "$1");
+  function lev(a, b) {
+    if (Math.abs(a.length - b.length) > 3) return 9;
+    let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[b.length];
+  }
 
   function parseDay(text, ctx) {
     const library = (ctx && ctx.library) || [], symptoms = (ctx && ctx.symptoms) || [];
@@ -89,7 +109,7 @@
 
     // ---- known items (food, supplements, medications, practices) ----
     const aliasList = [];
-    library.filter(i => !i.hidden).forEach(it => aliasesFor(it.name).forEach(a => aliasList.push({ a, it })));
+    library.filter(i => !i.hidden).forEach(it => aliasesFor(it.name, it.cat).forEach(a => aliasList.push({ a, it })));
     aliasList.sort((x, y) => y.a.length - x.a.length);
     let masked = t;
     const foundItems = new Map();
@@ -111,6 +131,39 @@
       }
     }
     for (const [id, f] of foundItems) if (!f.negated) { add({ kind: "item", id, cat: f.it.cat, name: f.it.name, dose: f.dose || "", time: f.time || "" }); used.add(f.it.name.toLowerCase()); }
+
+    // ---- near misses for known items ----
+    {
+      const words = []; const wre = /[a-z0-9]+/g; let w;
+      while ((w = wre.exec(masked))) words.push({ s: w[0], i: w.index, e: w.index + w[0].length });
+      const targets = aliasList.filter(x => !foundItems.has(x.it.id) && x.a.replace(/[^a-z0-9]/g, "").length >= 4).map(x => ({ ...x, key: soundKey(x.a), n: x.a.split(/\s+/).length }));
+      const taken = new Set();
+      for (const tg of targets) {
+        if (taken.has(tg.it.id)) continue;
+        const tol = Math.min(3, Math.max(1, Math.floor(tg.key.length / 4)));
+        for (let k = 0; k < words.length && !taken.has(tg.it.id); k++) {
+          for (const n of [tg.n, tg.n + 1, tg.n + 2, tg.n + 3, tg.n - 1].filter(x => x >= 1 && x <= 4)) { // spelled-out speech: "pro cal o pride"
+            const span = words.slice(k, k + n);
+            if (span.length < n) continue;
+            const heard = span.map(x => x.s).join(" ");
+            if (span.some(x => COMMON.has(x.s) || /^\d+$/.test(x.s)) || heard.replace(/ /g, "").length < 3) continue;
+            if (SYM_ANY.test(heard)) continue;
+            // short names like PHGG sound like too many words, so compare their letters exactly instead
+            const raw = heard.replace(/[^a-z0-9]/g, ""), rawT = tg.a.replace(/[^a-z0-9]/g, "");
+            const close = tg.key.length < 4 ? raw[0] === rawT[0] && lev(raw, rawT) <= 1 : (() => { const hk = soundKey(heard); return hk[0] === tg.key[0] && lev(hk, tg.key) <= tol; })();
+            if (!close) continue;
+            const start = span[0].i, end = span[n - 1].e, before = masked.slice(Math.max(0, start - 30), start);
+            masked = masked.slice(0, start) + "§".repeat(end - start) + masked.slice(end);
+            const si = sentIndexAt(start); if (si >= 0) sentHit[si] = true;
+            taken.add(tg.it.id);
+            if (NEGATE.test(before)) break;
+            add({ kind: "item", id: tg.it.id, cat: tg.it.cat, name: tg.it.name, dose: "", time: findTime(sents[si] || "", tg.it.cat === "food" ? sents[si] : "") || "", uncertain: true, why: `Heard "${heard}"` });
+            used.add(tg.it.name.toLowerCase());
+            break;
+          }
+        }
+      }
+    }
 
     // ---- new items from "ate / had / drank / took ..." ----
     const knownNames = new Set(aliasList.map(x => x.a));
@@ -136,6 +189,13 @@
           if (Object.values(SYM_WORDS).some(w => new RegExp(`^(?:${w})$`).test(part))) continue;
           used.add(part);
           sentHit[si] = true;
+          // "toast" when you already have "Sourdough toast": use the one existing item that contains the word
+          const partial = library.filter(it => !it.hidden && !foundItems.has(it.id) && part.length >= 4 && !part.includes(" ") && it.name.toLowerCase().split(/[^a-z0-9]+/).includes(part));
+          if (partial.length === 1 && !proposals.some(p => p.id === partial[0].id)) {
+            const it = partial[0];
+            add({ kind: "item", id: it.id, cat: it.cat, name: it.name, dose, time: it.cat === "food" ? findTime(s, s) || "" : "", uncertain: true, why: `Heard "${part}"` });
+            continue;
+          }
           add({ kind: "item", newName: part.replace(/\b\w/g, c => c.toUpperCase()), cat, dose, time: cat === "food" ? findTime(s, s) || "" : "", uncertain: true, why: "New item" });
         }
         break;

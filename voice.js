@@ -13,7 +13,11 @@ const VOICE_SECTIONS = [
 const SLEEP_LABEL = { hours: "Sleep", quality: "Sleep quality", wakes: "Night wakings" };
 const FOOD_LABEL = { first: "First bite", last: "Last bite", count: "Meals + snacks" };
 
-function openVoice() { openSheet({ k: "voice", step: "input", text: "" }); setTimeout(() => { const ta = $("#voice-text"); if (ta) ta.focus(); }, 320); }
+function openVoice() {
+  openSheet({ k: "voice", step: "input", text: "" });
+  if (sttSupported()) { if (sttModelCached()) sttLoad(); return; } // keep the keyboard out of the way of the Talk button
+  setTimeout(() => { const ta = $("#voice-text"); if (ta) ta.focus(); }, 320);
+}
 
 function proposalRow(p, s) {
   const on = !!s.keep[p.pid], d = getDay(UI.date) || { symptoms: {}, sleep: {}, food: {} };
@@ -57,7 +61,8 @@ function proposalRow(p, s) {
 
 function voiceSheetParts(s) {
   if (s.step === "input") return { title: "Your day", submitLabel: "Read it", body: `
-    <p class="sheet-text">Talk through your day: food and drinks, supplements and meds, symptoms and how bad they were, BMs, sleep, stress and FoodMarble numbers. Tap the microphone on your keyboard to dictate.</p>
+    <p class="sheet-text">Talk through your day: food and drinks, supplements and meds, symptoms and how bad they were, BMs, sleep, stress and FoodMarble numbers. ${sttSupported() ? "Tap <strong>Talk</strong>, or the microphone on your keyboard." : "Tap the microphone on your keyboard to dictate."}</p>
+    ${sttSupported() ? `<div id="stt-area">${sttHtml()}</div>` : ""}
     <div class="list"><div class="row"><textarea id="voice-text" name="text" rows="9" placeholder="Slept about 7 hours, woke up once. Eggs and toast with coffee at 8. Took berberine and magnesium. Bloating about a 4. BM around 9, type 4. Fasting methane 6. Stress was a 3.">${esc(s.text)}</textarea></div></div>
     <p class="group-f">Read on this phone. What you say isn't stored; only the entries you confirm are saved to ${UI.date === todayStr() ? "today" : esc(fmtDate(UI.date))}.</p>` };
   const groups = VOICE_SECTIONS.map(([name, test]) => [name, s.proposals.filter(test)]).filter(([, ps]) => ps.length);
@@ -190,3 +195,116 @@ document.addEventListener("click", e => {
     case "missSkipAll": { const d = touchDay(UI.date); d.skip = [...new Set([...(d.skip || []), ...missingFor(UI.date).map(m => m.key)])]; commitDay(UI.date, true); break; }
   }
 });
+
+
+// ---------- on-device speech to text (Moonshine, in stt-worker.js) ----------
+// Only in the installed app: claude.ai doesn't give pages the microphone.
+const STT = { worker: null, state: "idle", ready: false, loaded: 0, total: 0, startedAt: 0, rec: null, stream: null, parts: [], ctx: null, timer: null, wake: null, msg: "", job: 0, chunk: "" };
+const STT_FLAG = "root-journal-voice-model";
+const MAX_REC_S = 300;
+function sttSupported() { return !IN_VIEWER && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder && window.Worker && window.WebAssembly && window.OfflineAudioContext); }
+function sttModelCached() { try { return localStorage.getItem(STT_FLAG) === "1"; } catch (e) { return false; } }
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+function sttHtml() {
+  const st = STT.state, pct = STT.total ? Math.round(STT.loaded / STT.total * 100) : 0;
+  if (st === "loading") return `<div class="stt stt-load"><span class="row-label">${STT.total && pct < 100 ? `Downloading voice model · ${pct}%` : "Loading voice model…"}</span><span class="bar"><i style="width:${STT.total ? pct : 8}%"></i></span>
+    <span class="row-sub">${STT.total ? `${(STT.loaded / 1e6).toFixed(0)} of ${(STT.total / 1e6).toFixed(0)} MB. ` : ""}Keep the app open. This happens once.</span></div>`;
+  if (st === "recording") return `<div class="stt"><button type="button" class="talk rec" data-act="sttStop" aria-label="Stop recording"><span class="dot"></span>Stop</button>
+    <span class="row-main"><span class="row-label" id="stt-time">${mmss((Date.now() - STT.startedAt) / 1000)}</span><span class="row-sub">Listening. Tap Stop when you're done.</span></span></div>`;
+  if (st === "transcribing") return `<div class="stt"><span class="spinner"></span><span class="row-main"><span class="row-label">Turning speech into text…</span><span class="row-sub">${esc(STT.chunk || "On this phone")}</span></span></div>`;
+  if (!STT.ready && !sttModelCached()) return `<div class="stt stt-first"><span class="row-main"><span class="row-label">Talk instead of typing</span>
+    <span class="row-sub">Downloads a 63 MB speech model once (Wi-Fi is best). After that it works offline, and your voice never leaves this phone.</span></span>
+    <button type="button" class="btn filled small" data-act="sttDownload">Download</button></div>${STT.msg ? `<p class="group-f">${esc(STT.msg)}</p>` : ""}`;
+  return `<div class="stt"><button type="button" class="talk" data-act="sttStart">${icon("mic")}Talk</button>
+    <span class="row-main"><span class="row-sub">${esc(STT.msg || "Speak for as long as you like, up to 5 minutes. Text appears below to check before reading it.")}</span></span></div>`;
+}
+function sttPaint() { const el = $("#stt-area"); if (el) el.innerHTML = sttHtml(); }
+
+function sttWorker() {
+  if (STT.worker) return STT.worker;
+  STT.worker = new Worker("stt-worker.js", { type: "module" });
+  STT.worker.onmessage = ({ data }) => {
+    if (data.type === "progress") { STT.loaded = data.loaded; STT.total = data.total; if (STT.state === "loading") sttPaint(); }
+    else if (data.type === "ready") { STT.ready = true; try { localStorage.setItem(STT_FLAG, "1"); } catch (e) { /* convenience only */ } if (STT.state === "loading") { STT.state = "idle"; STT.msg = ""; sttPaint(); } }
+    else if (data.type === "partial") { if (data.n > 1) { STT.chunk = `Part ${data.i} of ${data.n}`; sttPaint(); } }
+    else if (data.type === "result") { if (data.id === STT.job) sttInsert(data.text); }
+    else if (data.type === "error") {
+      STT.state = "idle"; STT.ready = false;
+      STT.msg = /fetch|network|load/i.test(data.message) ? "Couldn't download the voice model. Check your connection and try again." : "Something went wrong turning speech into text. Try again, or use the keyboard microphone.";
+      sttPaint();
+    }
+  };
+  STT.worker.onerror = () => { STT.state = "idle"; STT.msg = "The voice model couldn't start on this phone. The keyboard microphone still works."; STT.worker = null; sttPaint(); };
+  return STT.worker;
+}
+function sttLoad() { if (STT.ready || STT.state === "loading") return; STT.state = "loading"; STT.loaded = STT.total = 0; sttPaint(); sttWorker().postMessage({ type: "load" }); }
+
+async function sttStart() {
+  if (!STT.ready) { sttLoad(); return; }
+  try {
+    STT.ctx = STT.ctx || new (window.AudioContext || window.webkitAudioContext)(); // created on the tap, as iOS requires
+    STT.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+  } catch (e) {
+    STT.msg = e && e.name === "NotAllowedError" ? "Microphone access is off. Allow it in Settings → Safari → Microphone (or for this app), then try again." : "Couldn't start the microphone.";
+    sttPaint(); return;
+  }
+  STT.parts = [];
+  STT.rec = new MediaRecorder(STT.stream);
+  STT.rec.ondataavailable = e => { if (e.data && e.data.size) STT.parts.push(e.data); };
+  STT.rec.onstop = sttFinish;
+  STT.rec.start(1000);
+  STT.state = "recording"; STT.startedAt = Date.now(); STT.msg = "";
+  try { STT.wake = await navigator.wakeLock.request("screen"); } catch (e) { STT.wake = null; }
+  haptic(); sttPaint();
+  clearInterval(STT.timer);
+  STT.timer = setInterval(() => {
+    const s = (Date.now() - STT.startedAt) / 1000, el = $("#stt-time");
+    if (el) el.textContent = mmss(s);
+    if (s >= MAX_REC_S) sttStop();
+  }, 500);
+}
+function sttStop() {
+  clearInterval(STT.timer);
+  if (STT.rec && STT.rec.state !== "inactive") STT.rec.stop();
+  if (STT.stream) STT.stream.getTracks().forEach(t => t.stop());
+  if (STT.wake) { STT.wake.release().catch(() => {}); STT.wake = null; }
+  haptic();
+}
+async function sttFinish() {
+  STT.state = "transcribing"; STT.chunk = ""; sttPaint();
+  try {
+    const blob = new Blob(STT.parts, { type: STT.rec.mimeType || "audio/mp4" });
+    STT.parts = [];
+    const decoded = await STT.ctx.decodeAudioData(await blob.arrayBuffer());
+    // resample to 16 kHz mono, the rate the model expects
+    const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(decoded.duration * 16000)), 16000);
+    const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
+    const audio = (await off.startRendering()).getChannelData(0);
+    if (audio.length < 16000 * 0.5) { STT.state = "idle"; STT.msg = "That was too short to hear. Try again."; sttPaint(); return; }
+    STT.job++;
+    sttWorker().postMessage({ type: "transcribe", id: STT.job, audio }, [audio.buffer]);
+  } catch (e) {
+    STT.state = "idle"; STT.msg = "Couldn't read that recording. Try again, or use the keyboard microphone."; sttPaint();
+  }
+}
+function sttInsert(text) {
+  STT.state = "idle";
+  const ta = $("#voice-text"), s = UI.sheet;
+  if (!text) { STT.msg = "Didn't catch any words. Try again a little closer to the phone."; sttPaint(); return; }
+  STT.msg = "Added below. Talk again to add more, or tap Read it.";
+  if (ta) { ta.value = (ta.value.trim() ? ta.value.trim() + " " : "") + text; if (s && s.k === "voice") s.text = ta.value; ta.scrollTop = ta.scrollHeight; }
+  haptic(); sttPaint();
+}
+// Closing the sheet mid-recording stops the microphone and throws the audio away.
+function sttCancel() { if (STT.state === "recording") { STT.rec.onstop = null; sttStop(); STT.parts = []; STT.state = "idle"; } }
+
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-act]");
+  if (!t) return;
+  if (t.dataset.act === "sttDownload") sttLoad();
+  else if (t.dataset.act === "sttStart") sttStart();
+  else if (t.dataset.act === "sttStop") sttStop();
+  else if (t.dataset.act === "closeSheet") sttCancel();
+});
+window.addEventListener("popstate", sttCancel);

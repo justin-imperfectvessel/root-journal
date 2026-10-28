@@ -1,7 +1,7 @@
 /* SIBO Root Journal service worker: caches the app shell so it opens offline.
    build-pwa.py fills in VERSION and FILES; a new version replaces the old cache. */
-const VERSION = "fa5ab04bc3de";
-const FILES = ["./", "index.html", "knowledge.js", "core.js", "vault.js", "parser.js", "ui.js", "results.js", "voice.js", "manifest.webmanifest", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png"];
+const VERSION = "1bf8bc021506";
+const FILES = ["./", "index.html", "knowledge.js", "core.js", "vault.js", "parser.js", "ui.js", "results.js", "voice.js", "stt-worker.js", "manifest.webmanifest", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png"];
 const CACHE = "root-journal-" + VERSION;
 
 self.addEventListener("install", e => {
@@ -15,7 +15,8 @@ self.addEventListener("activate", e => {
 });
 
 // The display font (Google Fonts) and the PDF reader (cdnjs) load from other hosts; keep copies so they work offline.
-const FONT_HOSTS = ["https://fonts.googleapis.com", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"];
+// …and the speech library and its runtime (jsdelivr). The speech model itself is cached by the library.
+const FONT_HOSTS = ["https://fonts.googleapis.com", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"];
 
 // Same-origin GETs and the font: serve from cache, refresh in the background. Everything else goes to the network.
 self.addEventListener("fetch", e => {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-10-27 21:03";</script>
+<script>window.APP_BUILD = "2026-10-27 21:23";</script>
 <title>SIBO Root Journal</title>
 <meta name="description" content="Daily SIBO/IMO journal with tap-to-log checkboxes, FoodMarble tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -426,6 +426,20 @@ input.filled { background: var(--pop) !important; border-radius: 6px; padding: 2
 .missing-group .group-f { margin-top: 4px; }
 
 .report { margin: 0; white-space: pre-wrap; word-break: break-word; font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; -webkit-user-select: text; user-select: text; }
+
+/* talk button (on-device speech to text) */
+#stt-area { margin-bottom: 14px; }
+.stt { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: var(--line) solid var(--ink); border-radius: var(--r); background: var(--paper); }
+.stt-load { display: grid; gap: 6px; }
+.stt .bar { display: block; height: 8px; border: var(--line-thin) solid var(--ink); border-radius: 4px; overflow: hidden; }
+.stt .bar i { display: block; height: 100%; background: var(--ink); transition: width .3s; }
+.talk { display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 22px; border-radius: 999px; border: var(--line) solid var(--ink); background: var(--ink); color: var(--paper); font-size: 18px; font-weight: 700; cursor: pointer; flex: none; }
+.talk .ic { width: 22px; height: 22px; stroke-width: 2.2; }
+.talk.rec { background: var(--paper); color: var(--ink); }
+.talk .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--bad); }
+@media (prefers-reduced-motion: no-preference) { .talk .dot { animation: pulse 1.2s ease-in-out infinite; } @keyframes pulse { 50% { opacity: .25; } } }
+#stt-time { font-family: var(--display); font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stt .spinner { flex: none; }
 
 /* misc */
 .empty { text-align: center; padding: 28px 20px 48px; display: grid; gap: 12px; justify-items: center; }
