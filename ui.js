@@ -75,7 +75,7 @@ function pageTitle(p) {
   if (!p) return (TABS.find(t => t[0] === UI.tab) || [])[1] || "";
   if (p.k === "driver") { const d = DRIVERS.find(x => x.id === p.id); return d ? d.name : ""; }
   if (p.k === "tx") return PROTOCOLS[p.i] ? PROTOCOLS[p.i].name : "";
-  return { history: "History & labs", research: "Research library", data: "Data & backup", reminder: "Daily reminder", nosignal: "No signal yet", color: "Color", results: "Test results" }[p.k] || "";
+  return { history: "History & labs", research: "Research library", data: "Data & backup", reminder: "Daily reminder", nosignal: "No signal yet", color: "Color", results: "Test results", layout: "Layout check" }[p.k] || "";
 }
 
 // ---------- render ----------
@@ -99,11 +99,12 @@ function render() {
   const v = $("#view");
   if (UI.loading) { v.innerHTML = `<div class="loading"><span class="spinner"></span></div>`; return; }
   let html;
-  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, driver: viewDriver, tx: viewTx, nosignal: viewNoSignal })[p.k](p);
+  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, nosignal: viewNoSignal })[p.k](p);
   else html = ({ today: viewToday, trends: viewTrends, protocols: viewProtocols, insights: viewInsights, more: viewMore })[UI.tab]();
   v.innerHTML = (Store.mode === "demo" && !p ? `<div class="demo-pill"><span>Sample data · nothing is saved</span><button type="button" class="textbtn" data-act="exitDemo">Exit</button></div>` : "") + html;
   if (UI.tab === "insights" && !p && UI.aiText) paintAI();
   onScroll();
+  if (typeof queueLayoutCheck === "function") queueLayoutCheck();
 }
 function refreshStreak() {
   const tb = $("#tabbar .tabbtn .tabicon"); // first tab
@@ -422,6 +423,7 @@ function viewMore() {
     group("Learn", navRow({ label: "Research library", sub: `${DRIVERS.length} root causes · ${PROTOCOLS.length} protocols`, act: "push", attrs: `data-k="research"` })) +
     group("Data", navRow({ label: "Data & backup", sub: Store.mode === "cloud" ? "Saved to your private account" : Store.mode === "demo" ? "Viewing sample data" : "Saved on this device", act: "push", attrs: `data-k="data"` }) +
       (Store.mode === "demo" ? `<button type="button" class="row action" data-act="exitDemo"><span class="row-label">Exit sample data</span></button>` : `<button type="button" class="row action" data-act="demo"><span class="row-label">Explore with sample data</span></button>`)) +
+    group("Help", navRow({ label: "Layout check", sub: "Measures this screen if the page slides sideways", value: window.APP_BUILD ? window.APP_BUILD.slice(5) : "", act: "push", attrs: `data-k="layout"` })) +
     `<p class="footnote">SIBO Root Journal is a self-tracking tool. Rankings combine your answers, labs and journal patterns with published research to organize what you bring to your clinician. It isn't medical advice. If you have blood in your stool, unintended weight loss, vomiting, fever or severe pain, see a doctor promptly.</p>`;
 }
 
@@ -632,6 +634,7 @@ document.addEventListener("click", e => {
     case "unhideItem": { const it = S.profile.library.find(i => i.id === t.dataset.id); it.hidden = false; Store.saveProfile(); render(); break; }
     case "goReminder": UI.tab = "more"; UI.stack = []; pushPage({ k: "reminder", from: "More" }); break;
     case "ics": downloadIcs(); break;
+    case "copyLayout": { const txt = layoutReport(); navigator.clipboard.writeText(txt).then(() => toast("Report copied"), () => { const el = $("#layout-report"); const rg = document.createRange(); rg.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); toast("Selected: tap Copy"); }); break; }
     case "colorMode": S.profile.settings.color = t.dataset.v; Store.saveProfile(); haptic(); render(); break;
     case "face": {
       const d = touchDay(date), v = Number(t.dataset.v);
@@ -812,6 +815,48 @@ async function downloadIcs() {
   const time = (reminder() || { time: ($("#rem-time") || {}).value || "20:00" }).time;
   try { await Store.downloads.save({ filename: "sibo-journal-reminder.ics", data: icsText(time) }); toast("Open the file to add the reminder to your calendar"); }
   catch (e) { if (!e || e.code !== "declined") toast("Couldn't save the file here. Use Google Calendar instead."); }
+}
+
+// ---------- layout check ----------
+// Watches for the page getting wider than the screen, or zooming, and remembers what caused it,
+// so More → Layout check can report it from the phone itself.
+const LAYOUT = { maxScale: 1, maxScrollX: 0, worst: null, checks: 0 };
+function describeEl(el) { return el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.classList.length ? "." + [...el.classList].slice(0, 3).join(".") : ""); }
+function checkLayout() {
+  const de = document.documentElement, W = de.clientWidth, SW = Math.max(de.scrollWidth, document.body.scrollWidth), vv = window.visualViewport;
+  LAYOUT.checks++;
+  if (vv && vv.scale > LAYOUT.maxScale + 0.01) LAYOUT.maxScale = vv.scale;
+  LAYOUT.maxScrollX = Math.max(LAYOUT.maxScrollX, window.scrollX || 0, vv ? vv.offsetLeft : 0);
+  const wide = [];
+  document.querySelectorAll("body *").forEach(el => {
+    const r = el.getBoundingClientRect();
+    if (!r.width || (r.right <= W + 1 && r.left >= -1)) return;
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if (ox !== "visible" && p.id !== "screen") return; }
+    wide.push(`${describeEl(el)} (${Math.round(r.left)} to ${Math.round(r.right)})`);
+  });
+  if (SW > W + 1 || wide.length) LAYOUT.worst = { at: new Date().toLocaleTimeString(), where: pageTitle(page()), W, SW, wide: wide.slice(0, 8) };
+}
+let layoutTimer = null;
+const queueLayoutCheck = () => { clearTimeout(layoutTimer); layoutTimer = setTimeout(checkLayout, 400); };
+window.addEventListener("scroll", queueLayoutCheck, { passive: true });
+if (window.visualViewport) { visualViewport.addEventListener("resize", queueLayoutCheck); visualViewport.addEventListener("scroll", queueLayoutCheck); }
+
+function layoutReport() {
+  const de = document.documentElement, vv = window.visualViewport, w = LAYOUT.worst;
+  return [
+    `Version: ${window.APP_BUILD || "claude.ai preview"}`,
+    `Screen width: ${de.clientWidth}px · page width now: ${Math.max(de.scrollWidth, document.body.scrollWidth)}px`,
+    `Zoom now: ${vv ? vv.scale.toFixed(2) : "n/a"} · highest seen: ${LAYOUT.maxScale.toFixed(2)}`,
+    `Sideways offset seen: ${Math.round(LAYOUT.maxScrollX)}px`,
+    w ? `Too wide at ${w.at} on ${w.where}: page ${w.SW}px on a ${w.W}px screen${w.wide.length ? "\n  " + w.wide.join("\n  ") : ""}` : "Nothing wider than the screen found yet",
+    `Standalone: ${matchMedia("(display-mode: standalone)").matches || navigator.standalone ? "yes" : "no"} · ${navigator.userAgent.match(/OS [\d_]+/) ? navigator.userAgent.match(/OS [\d_]+/)[0].replace(/_/g, ".") : ""}`,
+  ].join("\n");
+}
+function viewLayout() {
+  checkLayout();
+  return `<div class="spacer"></div>` + group("What this phone reports", `<div class="row"><pre class="report" id="layout-report">${esc(layoutReport())}</pre></div>
+      <button type="button" class="row action" data-act="copyLayout"><span class="row-label">Copy report</span></button>`,
+    "To test: go to Today, scroll up and down until the page slides sideways, then come back here and copy the report. It only measures the screen; nothing is sent anywhere.");
 }
 
 // ---------- boot ----------

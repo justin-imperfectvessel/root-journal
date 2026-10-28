@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<script>window.APP_BUILD = "2026-10-27 21:03";</script>
 <title>SIBO Root Journal</title>
 <meta name="description" content="Daily SIBO/IMO journal with tap-to-log checkboxes, FoodMarble tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -43,7 +44,7 @@
   --tint: oklch(calc(1 - var(--w) * .04) calc(var(--w) * .045) var(--h));
   --pop: oklch(calc(.96 - var(--w) * .2) calc(var(--w) * .2) var(--h));
   --deep: oklch(calc(.18 + var(--w) * .27) calc(var(--w) * .16) var(--h)); }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; overflow-x: hidden; touch-action: manipulation; } /* no sideways page panning, no double-tap zoom; pinch-zoom still works */
 html.sheet-open { overflow: hidden; }
 body { background: var(--paper); color: var(--ink); font-family: var(--font); font-size: 17px; line-height: 1.35; letter-spacing: -0.01em; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--paper); }
@@ -423,6 +424,8 @@ input.filled { background: var(--pop) !important; border-radius: 6px; padding: 2
 .iconbtn.sm .ic { width: 15px; height: 15px; stroke-width: 2.6; }
 .missing-group .list { border-style: dashed; }
 .missing-group .group-f { margin-top: 4px; }
+
+.report { margin: 0; white-space: pre-wrap; word-break: break-word; font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; -webkit-user-select: text; user-select: text; }
 
 /* misc */
 .empty { text-align: center; padding: 28px 20px 48px; display: grid; gap: 12px; justify-items: center; }
