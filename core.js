@@ -196,7 +196,13 @@ function dayScore(d) {
 function thresholds() {
   return S.profile.settings.unit === "ppm" ? { h2: 20, ch4: 10, low: 4, rise: 20, max: 100 } : { h2: 4, ch4: 4, low: 1, rise: 3, max: 10 };
 }
-function itemNames(d, map) { return (d.items || []).map(it => map[it.id]).filter(Boolean); }
+// a saved meal counts as each of its foods, so a trigger inside it still shows up
+function expandIds(d, map) {
+  const out = [];
+  for (const e of d.items || []) { out.push(e.id); const it = map[e.id]; if (it && it.parts) it.parts.forEach(p => out.push(p.id)); }
+  return out;
+}
+function itemNames(d, map) { return expandIds(d, map).map(id => map[id]).filter(Boolean); }
 
 function rangeMean(start, end) {
   const vals = [];
@@ -359,7 +365,7 @@ function analyze() {
   // item correlations
   const correlations = [];
   for (const it of S.profile.library) {
-    const l = lift(d => d.items.some(x => x.id === it.id));
+    const l = lift(d => expandIds(d, map).includes(it.id));
     if (l) correlations.push({ it, ...l });
   }
   correlations.sort((a, b) => b.lift - a.lift);

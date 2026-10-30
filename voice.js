@@ -26,7 +26,7 @@ function proposalRow(p, s) {
   switch (p.kind) {
     case "item":
       label = esc(p.id ? p.name : p.newName);
-      sub = p.time ? fmtTime(p.time) : "";
+      sub = [p.qty && p.qty.text, p.time && fmtTime(p.time)].filter(Boolean).map(esc).join(" · ");
       edit = `${p.cat !== "food" ? `<input class="vdose" name="dose_${p.pid}" value="${esc(p.dose || "")}" placeholder="Dose" aria-label="Dose">` : ""}
         ${!p.id ? `<select name="cat_${p.pid}" aria-label="Category">${[["food", "Food"], ["supp", "Supplement"], ["tx", "Medication"], ["practice", "Practice"]].map(([k, n]) => `<option value="${k}" ${p.cat === k ? "selected" : ""}>${n}</option>`).join("")}</select>` : ""}`;
       break;
@@ -115,8 +115,9 @@ function submitVoiceSheet(fd) {
         const it = p.id ? map[p.id] : addLibraryItem(p.newName, p.cat);
         if (!it) break;
         if (p.dose) it.dose = p.dose;
-        const ex = d.items.find(x => x.id === it.id);
-        if (ex) { if (p.dose) ex.dose = p.dose; if (p.time) ex.time = p.time; }
+        const ex = d.items.find(x => x.id === it.id), qu = it.cat === "food" ? resolveQty(it, p.qty) : {};
+        if (ex) { if (p.dose) ex.dose = p.dose; if (p.time) ex.time = p.time; Object.assign(ex, qu); }
+        else if (it.cat === "food") d.items.push(newFoodEntry(it, date, { time: p.time || "", ...qu }));
         else d.items.push({ id: it.id, dose: p.dose || it.dose || "", time: p.time || "" });
         break;
       }

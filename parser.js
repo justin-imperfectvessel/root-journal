@@ -81,6 +81,18 @@
   const NOT_ITEM = /^(it|that|this|them|the|a|an|my|your|some|nothing|a lot|lots|much|food|stuff|something|anything|everything|breakfast|lunch|dinner|snack|snacks|meal|meals|a meal|my meal|my supplements|my meds|supplements|meds|medication|bm|a bm|bms|sleep|stress|pain|gas|bloating|period|my period|\d+.*|fun|time|day|enough|a good day|a bad day|a rough day|a great day)$/;
   const CLEAN = /^(?:(?:a|an|the|some|my|of|more|another|bit of|little|small|large|big|bowl of|cup of|cups of|glass of|slice of|slices of|piece of|pieces of|handful of|plate of|serving of|scoop of|few|couple(?: of)?|\d+(?:\.\d+)?|half|extra)\s+)+/;
   const DOSE = /(\d+(?:\.\d+)?)\s?(mg|mcg|µg|g|grams?|iu|ml|caps?|capsules?|tablets?|tabs?|pills?|drops?|scoops?|tsp|tbsp)\b/;
+  // food amounts: "2 slices of", "200 grams", "a cup of", "half a"
+  const QTY = "(\\d+(?:\\.\\d+)?|a couple(?: of)?|couple(?: of)?|a few|few|half(?: a| an)?|a half|a|an)\\s+(?:(cups?|slices?|pieces?|tablespoons?|tbsps?|teaspoons?|tsps?|grams?|g|ounces?|oz|bowls?|handfuls?|servings?|scoops?|glass(?:es)?|plates?|large|medium|small|big)\\s+)?(?:of\\s+)?";
+  const QTY_END = new RegExp(QTY + "$"), QTY_LEAD = new RegExp("^\\s*" + QTY);
+  const UNIT_KEY = [[/^cups?$/, "cup"], [/^slices?$/, "slice"], [/^pieces?$/, "piece"], [/^(tablespoons?|tbsps?)$/, "tbsp"], [/^(teaspoons?|tsps?)$/, "tsp"], [/^(grams?|g)$/, "g"],
+    [/^(ounces?|oz)$/, "oz"], [/^bowls?$/, "bowl"], [/^handfuls?$/, "handful"], [/^servings?$/, "serving"], [/^scoops?$/, "scoop"], [/^glass(es)?$/, "glass"], [/^plates?$/, "plate"],
+    [/^(large|big)$/, "large"], [/^medium$/, "medium"], [/^small$/, "small"]];
+  function qtyFrom(m) {
+    if (!m) return null;
+    const w = m[1], q = /^\d/.test(w) ? Number(w) : /half/.test(w) ? 0.5 : /couple/.test(w) ? 2 : /few/.test(w) ? 3 : 1;
+    const unit = m[2] ? (UNIT_KEY.find(([re]) => re.test(m[2])) || [])[1] || "" : "";
+    return { q, unit, text: m[0].trim().replace(/\s+of$/, "") };
+  }
 
   // Near-miss matching for names speech-to-text gets slightly wrong ("allison" for allicin, "phg" for PHGG).
   // Compares rough sound-alike keys and allows about one wrong letter per four.
@@ -127,10 +139,11 @@
         const after = t.slice(m.index + m[0].length, m.index + m[0].length + 24);
         const da = after.match(new RegExp("^\\W{0,3}" + DOSE.source)), db = before.match(new RegExp(DOSE.source + "\\s*(?:of\\s+)?$"));
         const dose = (da ? da[0].replace(/^\W+/, "") : db ? db[0].trim() : "");
-        foundItems.set(it.id, { it, time: findTime(sent, it.cat === "food" ? sent : ""), dose });
+        const qty = it.cat === "food" ? qtyFrom(t.slice(Math.max(0, m.index - 30), m.index).match(QTY_END)) : null;
+        foundItems.set(it.id, { it, time: findTime(sent, it.cat === "food" ? sent : ""), dose: it.cat === "food" ? "" : dose, qty });
       }
     }
-    for (const [id, f] of foundItems) if (!f.negated) { add({ kind: "item", id, cat: f.it.cat, name: f.it.name, dose: f.dose || "", time: f.time || "" }); used.add(f.it.name.toLowerCase()); }
+    for (const [id, f] of foundItems) if (!f.negated) { add({ kind: "item", id, cat: f.it.cat, name: f.it.name, dose: f.dose || "", time: f.time || "", qty: f.qty || null }); used.add(f.it.name.toLowerCase()); }
 
     // ---- near misses for known items ----
     {
@@ -183,7 +196,10 @@
         // "chicken and rice around 12:30 then almonds": a time phrase separates items instead of ending the list
         const listTxt = m[1].replace(/\b(?:at|around|about|by)\s+\d{1,2}(?:[:.]\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?/g, ",").split(LIST_END)[0];
         for (let part of listTxt.split(/,|\band\b|\bwith\b|\bplus\b|\balong with\b|\bor\b|\bthen\b/)) {
-          const dose = (part.match(DOSE) || [])[0] || "";
+          const qty = cat === "food" ? qtyFrom(part.match(QTY_LEAD)) : null;
+          const dose = cat === "food" ? "" : (part.match(DOSE) || [])[0] || "";
+          if (qty) part = part.replace(QTY_LEAD, " ");
+          if (/^[\s§]*(?:cups?|slices?|pieces?|bowls?|glass(?:es)?|plates?|servings?|handfuls?|scoops?)?(?:\s+of)?[\s§]*$/.test(part)) continue; // only an amount left: its food was matched above
           part = part.replace(DOSE, "").replace(/§+/g, "").trim().replace(CLEAN, "").replace(/\b(?:today|this morning|tonight|again|too|as well|also|first|then)\b/g, "").replace(/[^a-z0-9 \-&]/g, "").replace(/\s+/g, " ").trim();
           if (!part || part.length < 3 || part.length > 32 || part.split(" ").length > 4 || NOT_ITEM.test(part) || knownNames.has(part) || used.has(part)) continue;
           if (Object.values(SYM_WORDS).some(w => new RegExp(`^(?:${w})$`).test(part))) continue;
@@ -193,10 +209,10 @@
           const partial = library.filter(it => !it.hidden && !foundItems.has(it.id) && part.length >= 4 && !part.includes(" ") && it.name.toLowerCase().split(/[^a-z0-9]+/).includes(part));
           if (partial.length === 1 && !proposals.some(p => p.id === partial[0].id)) {
             const it = partial[0];
-            add({ kind: "item", id: it.id, cat: it.cat, name: it.name, dose, time: it.cat === "food" ? findTime(s, s) || "" : "", uncertain: true, why: `Heard "${part}"` });
+            add({ kind: "item", id: it.id, cat: it.cat, name: it.name, dose, qty, time: it.cat === "food" ? findTime(s, s) || "" : "", uncertain: true, why: `Heard "${part}"` });
             continue;
           }
-          add({ kind: "item", newName: part.replace(/\b\w/g, c => c.toUpperCase()), cat, dose, time: cat === "food" ? findTime(s, s) || "" : "", uncertain: true, why: "New item" });
+          add({ kind: "item", newName: part.replace(/\b\w/g, c => c.toUpperCase()), cat, dose, qty, time: cat === "food" ? findTime(s, s) || "" : "", uncertain: true, why: "New item" });
         }
         break;
       }

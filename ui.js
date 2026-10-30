@@ -76,6 +76,7 @@ function pageTitle(p) {
   if (p.k === "driver") { const d = DRIVERS.find(x => x.id === p.id); return d ? d.name : ""; }
   if (p.k === "tx") return PROTOCOLS[p.i] ? PROTOCOLS[p.i].name : "";
   if (p.k === "insight") return "Insight";
+  if (p.k === "nutrition") return "Nutrition";
   return { history: "History & labs", research: "Research library", data: "Data & backup", reminder: "Daily reminder", nosignal: "No signal yet", color: "Color", results: "Test results", layout: "Layout check" }[p.k] || "";
 }
 
@@ -100,7 +101,7 @@ function render() {
   const v = $("#view");
   if (UI.loading) { v.innerHTML = `<div class="loading"><span class="spinner"></span></div>`; return; }
   let html;
-  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, nosignal: viewNoSignal, insight: viewInsight })[p.k](p);
+  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, nosignal: viewNoSignal, insight: viewInsight, nutrition: viewNutrition })[p.k](p);
   else html = ({ today: viewToday, trends: viewTrends, protocols: viewProtocols, insights: viewInsights, more: viewMore })[UI.tab]();
   v.innerHTML = (Store.mode === "demo" && !p ? `<div class="demo-pill"><span>Sample data · nothing is saved</span><button type="button" class="textbtn" data-act="exitDemo">Exit</button></div>` : "") + html;
   if (UI.tab === "insights" && !p && UI.aiText) paintAI();
@@ -203,17 +204,20 @@ function viewToday() {
     const on = d.items.filter(it => map[it.id] && map[it.id].cat === c.k);
     let inner = "";
     if (c.k === "food") {
+      inner += foodSummaryHtml(d);
       inner += `<div class="row fields3">
         <label><span>First bite</span><input type="time" id="food-first" data-act="food" data-f="first" value="${esc(d.food.first || "")}"></label>
         <label><span>Last bite</span><input type="time" id="food-last" data-act="food" data-f="last" value="${esc(d.food.last || "")}"></label>
         <label><span>Meals + snacks</span><input type="number" min="0" max="15" inputmode="numeric" id="food-count" data-act="food" data-f="count" value="${esc(d.food.count ?? "")}" placeholder="0"></label></div>`;
     }
     if (items.length) inner += `<div class="row chips-row"><div class="chips">${items.map(i => chip(i, checked.has(i.id))).join("")}</div></div>`;
+    if (c.k === "food") inner += foodLogHtml(d);
     if (on.length && c.k !== "food") inner += on.map(it => `<div class="row dose-row"><span class="row-label">${esc(map[it.id].name)}</span>
       <input id="dose-${it.id}" data-act="dose" data-id="${it.id}" value="${esc(it.dose || "")}" placeholder="Dose" aria-label="Dose for ${esc(map[it.id].name)}">
       <input id="time-${it.id}" type="time" data-act="itime" data-id="${it.id}" value="${esc(it.time || "")}" aria-label="Time taken"></div>`).join("");
-    inner += `<form class="row add-row" data-act="addItem" data-cat="${c.k}"><input id="add-${c.k}" name="name" placeholder="${c.ph}" autocomplete="off" enterkeyhint="done"><button class="textbtn strong" type="submit">Add</button></form>`;
-    h += group(`${c.name}${on.length ? ` <span class="gh-meta">${on.length}</span>` : ""}`, inner, c.k === "food" && !items.length ? "Separate several with commas." : "", "", { food: 145, supp: 265, tx: 220, practice: 75 }[c.k], "sec-" + c.k);
+    if (c.k === "food") inner += actionRow("Add food", "foodAdd");
+    else inner += `<form class="row add-row" data-act="addItem" data-cat="${c.k}"><input id="add-${c.k}" name="name" placeholder="${c.ph}" autocomplete="off" enterkeyhint="done"><button class="textbtn strong" type="submit">Add</button></form>`;
+    h += group(`${c.name}${on.length ? ` <span class="gh-meta">${on.length}</span>` : ""}`, inner, c.k === "food" && !items.length ? "Search 5,000+ foods with USDA nutrition, or add your own. Each food remembers your usual portion." : "", "", { food: 145, supp: 265, tx: 220, practice: 75 }[c.k], "sec-" + c.k);
   }
 
   // symptoms
@@ -272,6 +276,7 @@ function viewTrends() {
   const breath = span.map(d => { const bb = S.days[d] ? S.days[d].breath : []; return { h2: bb.length ? Math.max(...bb.map(r => num(r.h2) || 0)) : null, ch4: bb.length ? Math.max(...bb.map(r => num(r.ch4) || 0)) : null }; });
   if (breath.some(x => x.h2 != null)) h += group(`Breath peaks <span class="gh-meta"><i class="sw h2"></i>H₂ <i class="sw ch4"></i>CH₄ <i class="sw thr"></i>elevated</span>`, `<div class="row chart-row">${breathChart(span, breath, thresholds())}</div>`);
   h += group("Stool form", `<div class="row chart-row">${bristolChart(span)}</div>`, "Bristol type for each BM. Types 3 and 4 are the target band.");
+  h += trendsNutritionHtml();
   h += group("Recent days", dates.slice(-10).reverse().map(dt => { const d = S.days[dt]; return navRow({ label: esc(fmtDate(dt)), sub: esc([`${d.items.length} items`, d.noBM ? "no BM" : d.bms.length ? `BM ${d.bms.map(x => x.bristol || "?").join(", ")}` : "", d.breath.length ? `${d.breath.length} breath` : ""].filter(Boolean).join(" · ")), value: dayScore(d) == null ? "" : `<span class="score-chip">${r1(dayScore(d))}</span>`, act: "openDay", attrs: `data-d="${dt}"` }); }).join(""));
   return h;
 }
@@ -377,6 +382,7 @@ function viewMore() {
   const answered = INTAKE.filter(q => S.profile.intake[q.k]).length, r = reminder();
   return largeTitle("More") +
     group("Your profile", navRow({ label: "History & labs", value: `${answered}/${INTAKE.length}`, act: "push", attrs: `data-k="history"` }) +
+      navRow({ label: "Nutrition & targets", sub: S.profile.body && S.profile.body.w ? `About ${fmtN(nutritionTargets().T.kcal)} kcal · ${fmtN(nutritionTargets().T.p)} g protein` : "Set targets for eating enough", act: "push", attrs: `data-k="nutrition"` }) +
       navRow({ label: "Test results", sub: "Encrypted on this device", value: String((S.profile.results || []).length || ""), act: "push", attrs: `data-k="results"` }) +
       navRow({ label: "Daily reminder", value: r ? fmtTime(r.time) : "Off", act: "push", attrs: `data-k="reminder"` }) +
       `<div class="row field-row"><span class="row-label">FoodMarble units</span>${seg("Units", [["level", "Levels"], ["ppm", "ppm"]], S.profile.settings.unit, "unit")}</div>` +
@@ -461,6 +467,7 @@ function renderSheet() {
   let title = "", body = "", form = true, del = "", submitLabel = "";
   if (RESULT_SHEETS.includes(s.k)) ({ title, body, form = true, del = "", submitLabel = "" } = resultSheetParts(s));
   else if (s.k === "voice") ({ title, body, submitLabel } = voiceSheetParts(s));
+  else if (FOOD_SHEETS.includes(s.k)) ({ title, body, form = true, del = "", submitLabel = "" } = foodSheetParts(s));
   else if (s.k === "bm") {
     const b = s.bm || { time: new Date().toTimeString().slice(0, 5), bristol: null };
     title = s.bm ? "Bowel movement" : "Add bowel movement";
@@ -555,7 +562,7 @@ document.addEventListener("click", e => {
     case "openDay": UI.date = t.dataset.d; UI.tab = "today"; UI.stack = []; render(); window.scrollTo(0, 0); break;
     case "toggle": {
       const d = touchDay(date), id = t.dataset.id, i = d.items.findIndex(x => x.id === id);
-      if (i >= 0) d.items.splice(i, 1); else d.items.push({ id, dose: (map[id] && map[id].dose) || "", time: "" });
+      if (i >= 0) d.items.splice(i, 1); else d.items.push(map[id] && map[id].cat === "food" ? newFoodEntry(map[id], date) : { id, dose: (map[id] && map[id].dose) || "", time: "" });
       haptic(); commitDay(date, true); break;
     }
     case "checkAll": {
@@ -565,7 +572,7 @@ document.addEventListener("click", e => {
     }
     case "copyPrev": {
       const prev = getDay(addDays(date, -1)), d = touchDay(date); let added = 0;
-      prev.items.forEach(it => { if (!d.items.some(x => x.id === it.id) && map[it.id] && !map[it.id].hidden) { d.items.push({ id: it.id, dose: it.dose || "", time: "" }); added++; } });
+      prev.items.forEach(it => { if (!d.items.some(x => x.id === it.id) && map[it.id] && !map[it.id].hidden) { d.items.push({ id: it.id, dose: it.dose || "", time: "", ...(it.q != null ? { q: it.q, u: it.u, meal: it.meal } : {}) }); added++; } });
       commitDay(date, true); toast(added ? `Added ${added} item${added > 1 ? "s" : ""} from yesterday` : "Everything from yesterday is already checked"); break;
     }
     case "quality": { const d = touchDay(date); d.sleep.quality = d.sleep.quality === Number(t.dataset.v) ? null : Number(t.dataset.v); commitDay(date, true); break; }
@@ -665,6 +672,7 @@ function submitSheet(fd) {
   const s = UI.sheet, date = UI.date;
   if (RESULT_SHEETS.includes(s.k)) { submitResultSheet(fd); return; }
   if (s.k === "voice") { submitVoiceSheet(fd); return; }
+  if (FOOD_SHEETS.includes(s.k)) { submitFoodSheet(fd); return; }
   if (s.k === "bm") {
     const day = touchDay(date), b = s.bm || { id: newId() };
     Object.assign(b, { time: fd.get("time") || "", bristol: fd.get("bristol") ? Number(fd.get("bristol")) : null });
@@ -709,6 +717,7 @@ function aiSummary() {
     topDrivers: ranked.map(r => ({ name: r.d.name, match: LEVEL_LABEL[r.level], points: Math.round(r.pts * 10) / 10, evidence: r.why.map(w => w.label) })),
     beforeWorseDays: A.correlations.filter(c => c.lift >= 0.7).slice(0, 6).map(c => `${c.it.name} (+${r1(c.lift)})`),
     beforeBetterDays: A.correlations.filter(c => c.lift <= -0.7).slice(-6).map(c => `${c.it.name} (${r1(c.lift)})`),
+    nutrition14d: (() => { const a = nutritionAverage(14), { T } = nutritionTargets(); return a && { measuredDays: a.days, average: Object.fromEntries(NUT_KEYS.map(k => [NUT_INFO[k][0] + " (" + NUT_INFO[k][1] + ")", Math.round(a.avg[k] * 10) / 10])), targets: Object.fromEntries(MACROS.map(k => [NUT_INFO[k][0], T[k]])) }; })(),
     insights: buildInsights().list.filter(x => x.kind !== "gap").slice(0, 8).map(x => ({ finding: x.title, type: x.kind, confidence: x.conf || "", evidence: x.evidence.map(e => e[1]), test: x.result ? x.result.text : undefined })),
     protocols: A.protoStats.map(({ p, s }) => ({ name: p.name, type: p.kind, start: p.start, end: p.end || "ongoing", items: p.itemIds.map(id => A.map[id] && A.map[id].name).filter(Boolean), before: r1(s.base.mean), during: r1(s.during.mean), last7: r1(s.late.mean), after: r1(s.after.mean), verdict: s.verdict })),
   };

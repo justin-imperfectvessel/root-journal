@@ -62,7 +62,7 @@ function dayStats() {
   // items, with ones you always take together treated as one bundle
   const onSets = {};
   for (const it of S.profile.library) {
-    const s = new Set(dates.filter(d => S.days[d].items.some(x => x.id === it.id)));
+    const s = new Set(dates.filter(d => expandIds(S.days[d], map).includes(it.id)));
     if (s.size >= 4) onSets[it.id] = s;
   }
   const ids = Object.keys(onSets), used = new Set(), bundles = [];
