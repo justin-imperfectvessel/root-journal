@@ -63,6 +63,8 @@ function buildReport(range) {
 4. List what's missing or contradictory: data that would change the picture.
 5. Suggest specific tests and questions for my clinician, and 1–2 journal experiments (what to change, for how long, what to track).
 
+Use both Western (conventional) medicine and alternative and integrative approaches, such as functional medicine, naturopathy, herbal medicine, Traditional Chinese Medicine and Ayurveda, in how you explain what's going on and in what you suggest. For each idea, say which tradition it comes from and how strong the evidence behind it is.
+
 Be specific to my numbers. If a pattern rests on only a few days, say so.
 
 How to read the data: symptoms, the overall gut day and stress are 0–10, where 0 is none or best. The day score is the overall gut day when given, or else the average of the 3 worst symptoms. Bristol stool type runs 1–7: 1–2 hard, 3–4 ideal, 5–7 loose. BM size is by volume (a cup is about a fist). Breath readings are ${unit}; the app treats H2 ≥ ${T.h2} and CH4 ≥ ${T.ch4} as elevated. Times are 24-hour.`);
