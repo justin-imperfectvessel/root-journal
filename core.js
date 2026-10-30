@@ -455,19 +455,42 @@ function sampleState() {
 }
 
 // ---------- color that returns as you recover ----------
-// 0 = black and white, 1 = full color. Driven by the 7-day average day score (0 best, 10 worst):
-// an average of 6.5 or worse stays monochrome, 1.5 or better is fully vibrant.
-const COLOR_STAGES = ["Black and white for now", "First hints of color", "Pastels", "Soft color", "Brighter color", "Full color"];
-function recentAverage() {
-  const t = todayStr(), vals = [];
-  for (let i = 0; i < 7; i++) { const s = dayScore(S.days[addDays(t, -i)]); if (s != null) vals.push(s); }
-  return vals.length >= 3 ? { avg: mean(vals), n: vals.length } : null;
+// The app starts black and white. Every 3 good days in a row bring back one of 5 steps of color, and
+// 3 rough days in a row quietly take one away. A day with no rating pauses a run rather than breaking it.
+// Good: the overall gut day rated Good or Great (4 or lower), or without one, a day score of 3 or lower.
+// Rough: an overall of 6 or worse (Rough or Awful), or a day score of 6 or worse. Nothing explains this
+// in the app until the first step comes back.
+const COLOR_STEPS = 5;
+function dayMood(d) {
+  if (!d) return null;
+  if (typeof d.overall === "number") return d.overall <= 4 ? "good" : d.overall >= 6 ? "rough" : "mid";
+  const s = dayScore(d);
+  return s == null ? null : s <= 3 ? "good" : s >= 6 ? "rough" : "mid";
+}
+function colorSteps() {
+  const t = todayStr();
+  let steps = 0, good = 0, rough = 0;
+  for (const date of Object.keys(S.days).sort()) {
+    if (date > t) break;
+    const m = dayMood(S.days[date]);
+    if (m == null) continue;
+    good = m === "good" ? good + 1 : 0;
+    rough = m === "rough" ? rough + 1 : 0;
+    if (good && good % 3 === 0) steps = Math.min(COLOR_STEPS, steps + 1);
+    if (rough && rough % 3 === 0) steps = Math.max(0, steps - 1);
+  }
+  return steps;
 }
 function colorLevel() {
-  const mode = S.profile.settings.color || "auto";
-  if (mode === "mono") return 0;
-  if (mode === "full") return 1;
-  const r = recentAverage();
-  return r ? clamp((6.5 - r.avg) / 5) : 0;
+  return S.profile.settings.color === "mono" ? 0 : colorSteps() / COLOR_STEPS;
 }
-const colorStage = w => Math.min(5, Math.ceil(w * 5 - 0.001));
+// A step reached for the first time gets a message for the rest of the day; a fade passes silently,
+// so earning that step back gets its message again. Returns true when there's a new message.
+function colorAnnounce() {
+  const st = S.profile.settings, n = colorSteps(), shown = st.colorShown || 0;
+  if (n === shown) return false;
+  st.colorShown = n;
+  if (n > shown) Object.assign(st, { colorMsg: { date: todayStr(), step: n }, colorEarned: true });
+  Store.saveProfile();
+  return n > shown;
+}

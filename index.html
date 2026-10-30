@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-10-30 13:20";</script>
+<script>window.APP_BUILD = "2026-10-30 13:34";</script>
 <title>SIBO Root Journal</title>
 <meta name="description" content="Daily SIBO/IMO journal with tap-to-log checkboxes, FoodMarble tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap">
 <style>
 /* Layout: a black-ink notebook on white paper. Outlined cards and chips, condensed display titles, bottom tab bar (side rail from 900px), bottom sheets.
-   One number, --w (0 to 1, set from the 7-day average day score), brings color back: 0 is pure black and white, low values are pastels, 1 is vibrant.
+   One number, --w (0 to 1, the steps of color earned with good days, see core.js), brings color back: 0 is pure black and white, low values are pastels, 1 is vibrant.
    Each section sets its own hue with --h. Deliberately light-only: the design is ink on paper. */
 @property --w { syntax: "<number>"; inherits: true; initial-value: 0; }
 :root {

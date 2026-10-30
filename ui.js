@@ -88,6 +88,7 @@ function applyColor() {
   return w;
 }
 function render() {
+  if (!UI.loading) colorAnnounce();
   applyColor();
   const tb = $("#tabbar"), due = !UI.loading && reminderDue();
   tb.innerHTML = TABS.map(([k, n]) => `<button type="button" class="tabbtn" role="tab" aria-selected="${UI.tab === k}" data-act="tab" data-tab="${k}">
@@ -151,12 +152,16 @@ function streakRow() {
     <span class="streak-n">${s.cur}</span><span class="row-main"><span class="row-label">${s.cur === 1 ? "day" : "days"} in a row</span><span class="row-sub">${esc(status)}</span></span>
     <span class="row-value">Best ${s.best}<br>${s.month}/30</span></button>`;
 }
+function colorSwatches(n, big) {
+  return `<span class="swatches${big ? " big" : ""}" aria-hidden="true">${[0, 1, 2, 3, 4].map(i => `<i class="${i < n ? "on" : ""}" style="--h:${[150, 230, 300, 40, 90][i]}"></i>`).join("")}</span>`;
+}
+// only on the day a step of color comes back
 function colorRow() {
-  const w = colorLevel(), st = colorStage(w), r = recentAverage(), mode = S.profile.settings.color || "auto";
-  const sub = mode === "mono" ? "Always black and white (change in More)" : mode === "full" ? "Always full color (change in More)"
-    : r ? `7-day average ${r1(r.avg)}. Color comes back as it drops.` : "Log 3 days this week to start tracking.";
-  return `<button type="button" class="streak colorrow" data-act="push" data-k="color"><span class="swatches" aria-hidden="true">${[0, 1, 2, 3, 4].map(i => `<i class="${i < st ? "on" : ""}" style="--h:${[150, 230, 300, 40, 90][i]}"></i>`).join("")}</span>
-    <span class="row-main"><span class="row-label">${COLOR_STAGES[st]}</span><span class="row-sub">${esc(sub)}</span></span>${icon("chevR", "chev")}</button>`;
+  const st = S.profile.settings, m = st.colorMsg;
+  if (!m || m.date !== todayStr() || st.color === "mono") return "";
+  const msg = m.step >= COLOR_STEPS ? "Your world is back in full color." : m.step === 1 ? "A little color has come back to your world." : "A little more color has been brought back to your world.";
+  return `<div class="streak colorrow" role="status">${colorSwatches(m.step)}<span class="row-main"><span class="row-label">${msg}</span></span>
+    <button type="button" class="iconbtn" data-act="colorDismiss" aria-label="Dismiss">${icon("close")}</button></div>`;
 }
 function activeProtocols(date) { return S.profile.protocols.filter(p => p.start && p.start <= date && (!p.end || p.end >= date)); }
 function usageCounts() { const c = {}; for (const d of Object.values(S.days)) for (const it of d.items) c[it.id] = (c[it.id] || 0) + 1; return c; }
@@ -384,7 +389,7 @@ function viewMore() {
       navRow({ label: "Test results", sub: "Encrypted on this device", value: String((S.profile.results || []).length || ""), act: "push", attrs: `data-k="results"` }) +
       navRow({ label: "Daily reminder", value: r ? fmtTime(r.time) : "Off", act: "push", attrs: `data-k="reminder"` }) +
       `<div class="row field-row"><span class="row-label">FoodMarble units</span>${seg("Units", [["level", "Levels"], ["ppm", "ppm"]], S.profile.settings.unit, "unit")}</div>` +
-      navRow({ label: "Color", value: { auto: "Follows how you feel", mono: "Black and white", full: "Full color" }[S.profile.settings.color || "auto"], act: "push", attrs: `data-k="color"` })) +
+      (S.profile.settings.colorEarned ? navRow({ label: "Color", value: S.profile.settings.color === "mono" ? "Black and white" : `${colorSteps()} of ${COLOR_STEPS}`, act: "push", attrs: `data-k="color"` }) : "")) +
     group("Learn", navRow({ label: "Research library", sub: `${DRIVERS.length} root causes · ${PROTOCOLS.length} protocols`, act: "push", attrs: `data-k="research"` })) +
     group("Data", navRow({ label: "Data & backup", sub: Store.mode === "cloud" ? "Saved to your private account" : Store.mode === "demo" ? "Viewing sample data" : "Saved on this device", act: "push", attrs: `data-k="data"` }) +
       (Store.mode === "demo" ? `<button type="button" class="row action" data-act="exitDemo"><span class="row-label">Exit sample data</span></button>` : `<button type="button" class="row action" data-act="demo"><span class="row-label">Explore with sample data</span></button>`)) +
@@ -439,12 +444,11 @@ function viewData() {
 }
 
 function viewColor() {
-  const mode = S.profile.settings.color || "auto", r = recentAverage(), w = colorLevel(), st = colorStage(w);
+  const mode = S.profile.settings.color === "mono" ? "mono" : "auto", n = colorSteps();
   const opt = (v, label, sub) => `<button type="button" class="row checkrow ${mode === v ? "on" : ""}" data-act="colorMode" data-v="${v}" aria-pressed="${mode === v}"><span class="row-main"><span class="row-label">${label}</span><span class="row-sub">${sub}</span></span><span class="circle">${icon("check")}</span></button>`;
-  return `<div class="spacer"></div><div class="stage-hero"><span class="swatches big" aria-hidden="true">${[0, 1, 2, 3, 4].map(i => `<i class="${i < st ? "on" : ""}" style="--h:${[150, 230, 300, 40, 90][i]}"></i>`).join("")}</span>
-      <h2>${COLOR_STAGES[st]}</h2><p>${mode !== "auto" ? "Set manually." : r ? `Your 7-day average day score is ${r1(r.avg)}.` : "Log at least 3 days this week to start."}</p></div>` +
-    group("Color", opt("auto", "Follows how you feel", "Starts black and white. Color fades in as your 7-day average improves.") + opt("mono", "Always black and white", "Calm and plain, whatever your scores") + opt("full", "Always full color", "Every color, all the time")) +
-    group("The stages", COLOR_STAGES.map((n, i) => `<div class="row"><span class="row-label">${n}</span><span class="row-value">${["6.5 or worse", "5.5 to 6.5", "4.5 to 5.5", "3.5 to 4.5", "2.5 to 3.5", "1.5 or better"][i]}</span></div>`).join(""), "Based on your 7-day average day score, where 0 is no symptoms and 10 is the worst. Between stages, color shifts gradually.");
+  return `<div class="spacer"></div><div class="stage-hero">${colorSwatches(mode === "mono" ? 0 : n, true)}
+      <h2>${mode === "mono" ? "Black and white" : n >= COLOR_STEPS ? "Full color" : `${n} of ${COLOR_STEPS} colors back`}</h2><p>Good stretches bring color back. Rough ones can fade it a little.</p></div>` +
+    group("Color", opt("auto", "Earned color", "Color comes back with your good days") + opt("mono", "Always black and white", "Calm and plain, whatever your days"));
 }
 function viewReminder() {
   const r = reminder(), time = r ? r.time : "20:00";
@@ -528,7 +532,7 @@ function pruneDay(date) {
   const empty = !d.items.length && !Object.keys(d.symptoms).length && !d.bms.length && !d.breath.length && d.overall == null && !d.notes && !d.noBM && !d.period && d.stress == null && !Object.values(d.sleep).some(v => v !== "" && v != null) && !Object.values(d.food).some(v => v !== "" && v != null);
   if (empty) delete S.days[date];
 }
-function commitDay(date, rerender) { pruneDay(date); Store.saveDay(date); if (rerender) render(); celebrateStart(); }
+function commitDay(date, rerender) { pruneDay(date); Store.saveDay(date); if (rerender || colorAnnounce()) render(); celebrateStart(); }
 function celebrateStart() {
   if (!UI.startedToday) return;
   UI.startedToday = false;
@@ -609,6 +613,7 @@ document.addEventListener("click", e => {
     case "ics": downloadIcs(); break;
     case "copyLayout": { const txt = layoutReport(); navigator.clipboard.writeText(txt).then(() => toast("Report copied"), () => { const el = $("#layout-report"); const rg = document.createRange(); rg.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); toast("Selected: tap Copy"); }); break; }
     case "colorMode": S.profile.settings.color = t.dataset.v; Store.saveProfile(); haptic(); render(); break;
+    case "colorDismiss": S.profile.settings.colorMsg = null; Store.saveProfile(); render(); break;
     case "face": {
       const d = touchDay(date), v = Number(t.dataset.v);
       d.overall = d.overall != null && FACES.find(f => f.value === v).test(d.overall) ? undefined : v;
