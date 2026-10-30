@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-10-30 13:34";</script>
+<script>window.APP_BUILD = "2026-10-30 13:38";</script>
 <title>SIBO Root Journal</title>
 <meta name="description" content="Daily SIBO/IMO journal with tap-to-log checkboxes, FoodMarble tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -495,6 +495,9 @@ input.filled { background: var(--pop) !important; border-radius: 6px; padding: 2
 #toast { position: fixed; left: 50%; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px) + 14px); z-index: 50; transform: translateX(-50%); max-width: calc(100% - 36px); width: max-content;
   background: var(--ink); color: var(--paper); padding: 12px 20px; border-radius: 999px; font-size: 15px; font-weight: 600; }
 #toast.show { animation: toast .25s ease-out; }
+#update-bar { position: fixed; left: 50%; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px) + 14px); z-index: 49; transform: translateX(-50%); width: max-content; max-width: calc(100% - 36px);
+  display: flex; align-items: center; gap: 14px; background: var(--paper); color: var(--ink); border: var(--line) solid var(--ink); padding: 8px 10px 8px 18px; border-radius: 999px; font-size: 15px; font-weight: 600; }
+#update-bar .textbtn { background: var(--ink); color: var(--paper); border-radius: 999px; padding: 6px 14px; }
 @keyframes toast { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 @media (max-width: 380px) {

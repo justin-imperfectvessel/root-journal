@@ -393,7 +393,7 @@ function viewMore() {
     group("Learn", navRow({ label: "Research library", sub: `${DRIVERS.length} root causes · ${PROTOCOLS.length} protocols`, act: "push", attrs: `data-k="research"` })) +
     group("Data", navRow({ label: "Data & backup", sub: Store.mode === "cloud" ? "Saved to your private account" : Store.mode === "demo" ? "Viewing sample data" : "Saved on this device", act: "push", attrs: `data-k="data"` }) +
       (Store.mode === "demo" ? `<button type="button" class="row action" data-act="exitDemo"><span class="row-label">Exit sample data</span></button>` : `<button type="button" class="row action" data-act="demo"><span class="row-label">Explore with sample data</span></button>`)) +
-    group("Help", navRow({ label: "Layout check", sub: "Measures this screen if the page slides sideways", value: window.APP_BUILD ? window.APP_BUILD.slice(5) : "", act: "push", attrs: `data-k="layout"` })) +
+    group("Help", (PWA_HOST && !IN_VIEWER ? navRow({ label: "Check for updates", sub: window.APP_BUILD ? `Version ${window.APP_BUILD.slice(5)}` : "", act: "appUpdate" }) : "") + navRow({ label: "Layout check", sub: "Measures this screen if the page slides sideways", value: window.APP_BUILD ? window.APP_BUILD.slice(5) : "", act: "push", attrs: `data-k="layout"` })) +
     `<p class="footnote">SIBO Root Journal is a self-tracking tool. Rankings combine your answers, labs and journal patterns with published research to organize what you bring to your clinician. It isn't medical advice. If you have blood in your stool, unintended weight loss, vomiting, fever or severe pain, see a doctor promptly.</p>`;
 }
 
@@ -852,6 +852,46 @@ let lastDue = null;
 setInterval(() => { if (UI.loading) return; const due = reminderDue(); if (due !== lastDue) { lastDue = due; refreshStreak(); } }, 60000);
 // Installed-app mode only: inside claude.ai the artifact host serves the page and service workers aren't available.
 const PWA_HOST = location.protocol === "https:" || location.hostname === "localhost";
-if ("serviceWorker" in navigator && !IN_VIEWER && PWA_HOST && document.querySelector('link[rel="manifest"]')) navigator.serviceWorker.register("sw.js").catch(() => {});
+// Updates: the app checks for a new deploy when it opens and each time it comes back to the front (iOS
+// rarely checks on its own), and offers a reload once the new version is cached. More → Check for updates forces it.
+const Updater = {
+  reg: null, offered: false, last: 0,
+  async liveBuild() {
+    try { const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); return r.ok ? (await r.json()).build : null; } catch (e) { return null; }
+  },
+  async check(manual) {
+    if (!this.reg) { if (manual) toast(window.APP_BUILD ? "Couldn't reach the update service. Try again in a moment." : "Updates apply to the installed app"); return; }
+    this.last = Date.now();
+    const live = await this.liveBuild();
+    if (!live) { if (manual) toast("You're offline. Updates need a connection."); return; }
+    if (live === window.APP_BUILD) { if (manual) toast(`You're up to date · ${live.slice(5)}`); return; }
+    if (manual) toast("Downloading the update…");
+    const changed = new Promise(res => { navigator.serviceWorker.addEventListener("controllerchange", res, { once: true }); setTimeout(res, 12000); });
+    try { await this.reg.update(); } catch (e) {}
+    // already installed while this page ran the old code: nothing new will take over, so just reload
+    if (!this.reg.installing && !this.reg.waiting) { this.ready(manual); return; }
+    await changed;
+    this.ready(manual);
+  },
+  ready(manual) {
+    if (manual) { location.reload(); return; }
+    if (this.offered) return;
+    this.offered = true;
+    const bar = document.createElement("div");
+    bar.id = "update-bar"; bar.setAttribute("role", "status");
+    bar.innerHTML = `<span>A new version is ready</span><button type="button" class="textbtn strong" data-act="appReload">Update</button>`;
+    document.body.appendChild(bar);
+  },
+};
+if ("serviceWorker" in navigator && !IN_VIEWER && PWA_HOST && document.querySelector('link[rel="manifest"]')) {
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(reg => { Updater.reg = reg; Updater.check(); }).catch(() => {});
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - Updater.last > 30000) Updater.check(); });
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-act]");
+  if (!t) return;
+  if (t.dataset.act === "appReload") location.reload();
+  else if (t.dataset.act === "appUpdate") Updater.check(true);
+});
 // Ask the browser not to clear this app's storage (the journal and the encrypted vault) when space runs low.
 if (!IN_VIEWER && navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => p || navigator.storage.persist()).catch(() => {});
