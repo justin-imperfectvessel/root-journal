@@ -36,6 +36,8 @@ const CATS = [
   { k: "practice", name: "Practices", ph: "Add a practice, e.g. walk after meals" },
 ];
 const BRISTOL = ["", "Hard lumps", "Lumpy sausage", "Cracked sausage", "Smooth, soft", "Soft blobs", "Mushy", "Watery"];
+// Stool amount by volume, as on clinical bowel records (a cup is about a fist)
+const BM_SIZE = { s: ["Small", "Under ½ cup"], m: ["Medium", "½ to 1 cup"], l: ["Large", "Over 1 cup"] };
 const PROTO_KINDS = [["antimicrobial", "Antimicrobial"], ["prokinetic", "Prokinetic"], ["diet", "Diet"], ["support", "Support / supplements"], ["lifestyle", "Lifestyle / nervous system"], ["other", "Other experiment"]];
 const CHALLENGES = ["", "Meal", "Lactulose", "Glucose", "Inulin", "Fructose", "Lactose", "Sorbitol"];
 
@@ -437,7 +439,7 @@ function sampleState() {
     const b = clamp(Math.round(base + (trig ? 1.5 : 0) + (rnd() - 0.5) * 2), 0, 10);
     d.symptoms = { bloating: b, distension: clamp(b - 1, 0, 10), gas: clamp(b - 2 + Math.round(rnd() * 2), 0, 10), pain: clamp(b - 3, 0, 10), fatigue: 4 + Math.round(rnd() * 3), brainfog: 3 + Math.round(rnd() * 3) };
     const bristol = onK ? 3 + Math.round(rnd()) : onP && rnd() > 0.5 ? 3 : 2 - Math.round(rnd());
-    if (rnd() > 0.2) d.bms.push({ id: newId(), time: "08:15", bristol: Math.max(1, bristol), incomplete: !onK && rnd() > 0.4, straining: !onK && rnd() > 0.5, urgency: false }); else d.noBM = true;
+    if (rnd() > 0.2) d.bms.push({ id: newId(), time: "08:15", bristol: Math.max(1, bristol), size: onK ? "m" : rnd() > 0.5 ? "s" : "m", incomplete: !onK && rnd() > 0.4, straining: !onK && rnd() > 0.5, urgency: false }); else d.noBM = true;
     if (i % 2 === 0) {
       const c = onP ? Math.max(2, 7 - (i - 15) * 0.18) : 7;
       d.breath.push({ id: newId(), time: "07:30", ctx: "fasting", mins: "", ch: "", h2: Math.round(rnd() * 2), ch4: Math.round(c + rnd()) });

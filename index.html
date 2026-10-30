@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-10-29 22:41";</script>
+<script>window.APP_BUILD = "2026-10-30 11:21";</script>
 <title>SIBO Root Journal</title>
 <meta name="description" content="Daily SIBO/IMO journal with tap-to-log checkboxes, FoodMarble tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -414,6 +414,8 @@ svg .bsdot.b1, svg .bsdot.b2 { fill: var(--ink); } svg .bsdot.b3, svg .bsdot.b4 
 .bt:has(input:checked) { background: var(--ink); color: var(--paper); }
 .bt:has(input:checked) .bt-l { color: var(--paper); }
 .bt:has(input:focus-visible) { outline: 2.5px solid var(--ink); outline-offset: 2px; }
+.size-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.size-grid .bt-l { display: block !important; }
 .bristol-key { font-size: 13px; color: var(--ink-2); margin: -6px 2px 20px; font-weight: 600; }
 @keyframes rise { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }

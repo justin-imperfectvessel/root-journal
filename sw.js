@@ -1,6 +1,6 @@
 /* SIBO Root Journal service worker: caches the app shell so it opens offline.
    build-pwa.py fills in VERSION and FILES; a new version replaces the old cache. */
-const VERSION = "cffe4c73c153";
+const VERSION = "5a478edc5940";
 const FILES = ["./", "index.html", "knowledge.js", "core.js", "vault.js", "parser.js", "ui.js", "insights.js", "nutrition.js", "results.js", "voice.js", "foods.json", "stt-worker.js", "manifest.webmanifest", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png"];
 const CACHE = "root-journal-" + VERSION;
 

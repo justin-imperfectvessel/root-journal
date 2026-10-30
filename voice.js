@@ -40,7 +40,7 @@ function proposalRow(p, s) {
     case "bm": {
       const b = p.bm;
       label = b.bristol ? `Type ${b.bristol} · ${BRISTOL[b.bristol]}` : "Bowel movement";
-      sub = [b.time && fmtTime(b.time), b.urgency && "urgent", b.incomplete && "incomplete", b.straining && "straining", b.mucus && "mucus", b.floating && "floating", b.blood && "blood"].filter(Boolean).join(" · ");
+      sub = [b.time && fmtTime(b.time), b.size && BM_SIZE[b.size] && BM_SIZE[b.size][0].toLowerCase(), b.urgency && "urgent", b.incomplete && "incomplete", b.straining && "straining", b.mucus && "mucus", b.floating && "floating", b.blood && "blood"].filter(Boolean).join(" · ");
       edit = `<select name="val_${p.pid}" aria-label="Bristol type"><option value="">Type?</option>${[1, 2, 3, 4, 5, 6, 7].map(n => `<option value="${n}" ${b.bristol === n ? "selected" : ""}>Type ${n}</option>`).join("")}</select>`;
       break;
     }
