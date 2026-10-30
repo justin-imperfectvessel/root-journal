@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-10-30 16:34";</script>
+<script>window.APP_BUILD = "2026-10-30 17:56";</script>
 <title>SIBO Root Journal</title>
 <meta name="description" content="Daily SIBO/IMO journal with tap-to-log checkboxes, FoodMarble tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -179,6 +179,7 @@ input, select, textarea { max-width: 100%; }
 
 /* chips */
 .chips-row { display: grid; gap: 9px; }
+#report-text { width: 100%; font: 12px/1.45 ui-monospace, Menlo, monospace !important; white-space: pre; overflow: auto; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 6px 14px; border-radius: 999px; border: var(--line) solid var(--ink); background: var(--paper); color: var(--ink); font-size: 15px; font-weight: 600; cursor: pointer; transition: background-color .12s, color .12s; }
 .chip.on { background: var(--pop); }
@@ -542,6 +543,7 @@ input.filled { background: var(--pop) !important; border-radius: 6px; padding: 2
 <script src="nutrition.js"></script>
 <script src="meals.js"></script>
 <script src="supplements.js"></script>
+<script src="report.js"></script>
 <script src="results.js"></script>
 <script src="voice.js"></script>
 

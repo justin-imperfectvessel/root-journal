@@ -696,6 +696,7 @@ function viewInsights() {
   if (Store.sample) h += group("Ask Claude", `<div class="row ai-row"><span class="row-sub">Sends a summary of your history, insights, rankings, breath pattern and protocol results, and asks for a plain-language read plus questions for your clinician.</span>
       <button type="button" class="btn filled" data-act="askAI" ${UI.aiBusy ? "disabled" : ""}>${icon("spark")}${UI.aiBusy ? "Reading your journal…" : UI.aiText ? "Ask again" : "Read my journal"}</button>
       <div id="aiout" class="aiout" ${UI.aiText ? "" : "hidden"}></div></div>`);
+  h += group("", navRow({ label: "Report for AI", sub: "Copy everything you've logged into any AI chat", act: "push", attrs: `data-k="report"` }));
   return h;
 }
 

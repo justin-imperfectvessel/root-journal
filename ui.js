@@ -77,7 +77,7 @@ function pageTitle(p) {
   if (p.k === "tx") return PROTOCOLS[p.i] ? PROTOCOLS[p.i].name : "";
   if (p.k === "insight") return "Insight";
   if (p.k === "nutrition") return "Nutrition";
-  return { history: "History & labs", research: "Research library", data: "Data & backup", reminder: "Daily reminder", nosignal: "No signal yet", color: "Color", results: "Test results", layout: "Layout check" }[p.k] || "";
+  return { history: "History & labs", research: "Research library", data: "Data & backup", reminder: "Daily reminder", nosignal: "No signal yet", color: "Color", results: "Test results", layout: "Layout check", report: "Report for AI" }[p.k] || "";
 }
 
 // ---------- render ----------
@@ -102,7 +102,7 @@ function render() {
   const v = $("#view");
   if (UI.loading) { v.innerHTML = `<div class="loading"><span class="spinner"></span></div>`; return; }
   let html;
-  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, nosignal: viewNoSignal, insight: viewInsight, nutrition: viewNutrition })[p.k](p);
+  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, nosignal: viewNoSignal, insight: viewInsight, nutrition: viewNutrition, report: viewReport })[p.k](p);
   else html = ({ today: viewToday, trends: viewTrends, protocols: viewProtocols, insights: viewInsights, more: viewMore })[UI.tab]();
   v.innerHTML = (Store.mode === "demo" && !p ? `<div class="demo-pill"><span>Sample data · nothing is saved</span><button type="button" class="textbtn" data-act="exitDemo">Exit</button></div>` : "") + html;
   if (UI.tab === "insights" && !p && UI.aiText) paintAI();
@@ -393,7 +393,7 @@ function viewMore() {
       `<div class="row field-row"><span class="row-label">FoodMarble units</span>${seg("Units", [["level", "Levels"], ["ppm", "ppm"]], S.profile.settings.unit, "unit")}</div>` +
       (S.profile.settings.colorEarned ? navRow({ label: "Color", value: S.profile.settings.color === "mono" ? "Black and white" : `${colorSteps()} of ${COLOR_STEPS}`, act: "push", attrs: `data-k="color"` }) : "")) +
     group("Learn", navRow({ label: "Research library", sub: `${DRIVERS.length} root causes · ${PROTOCOLS.length} protocols`, act: "push", attrs: `data-k="research"` })) +
-    group("Data", navRow({ label: "Data & backup", sub: Store.mode === "cloud" ? "Saved to your private account" : Store.mode === "demo" ? "Viewing sample data" : "Saved on this device", act: "push", attrs: `data-k="data"` }) +
+    group("Data", navRow({ label: "Report for AI", sub: "Everything you've logged, to paste into any AI", act: "push", attrs: `data-k="report"` }) + navRow({ label: "Data & backup", sub: Store.mode === "cloud" ? "Saved to your private account" : Store.mode === "demo" ? "Viewing sample data" : "Saved on this device", act: "push", attrs: `data-k="data"` }) +
       (Store.mode === "demo" ? `<button type="button" class="row action" data-act="exitDemo"><span class="row-label">Exit sample data</span></button>` : `<button type="button" class="row action" data-act="demo"><span class="row-label">Explore with sample data</span></button>`)) +
     group("Help", (PWA_HOST && !IN_VIEWER ? navRow({ label: "Check for updates", sub: window.APP_BUILD ? `Version ${window.APP_BUILD.slice(5)}` : "", act: "appUpdate" }) : "") + navRow({ label: "Layout check", sub: "Measures this screen if the page slides sideways", value: window.APP_BUILD ? window.APP_BUILD.slice(5) : "", act: "push", attrs: `data-k="layout"` })) +
     `<p class="footnote">SIBO Root Journal is a self-tracking tool. Rankings combine your answers, labs and journal patterns with published research to organize what you bring to your clinician. It isn't medical advice. If you have blood in your stool, unintended weight loss, vomiting, fever or severe pain, see a doctor promptly.</p>`;
@@ -596,6 +596,7 @@ document.addEventListener("click", e => {
     case "delBreath": { const d = touchDay(date); d.breath = d.breath.filter(r => r.id !== t.dataset.id); commitDay(date); closeSheet(); render(); break; }
     case "closeSheet": closeSheet(); break;
     case "unit": S.profile.settings.unit = t.dataset.v; Store.saveProfile(); render(); break;
+    case "reportRange": UI.reportRange = t.dataset.v; render(); break;
     case "range": UI.range = Number(t.dataset.v); render(); break;
     case "newProto": openSheet({ k: "proto", ed: { name: "", kind: "antimicrobial", start: todayStr(), end: "", itemIds: [], notes: "" } }); break;
     case "protoMenu": openSheet({ k: "menu", id: t.dataset.id }); break;
