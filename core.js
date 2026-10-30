@@ -416,9 +416,9 @@ const LEVEL_LABEL = { strong: "Strong match", likely: "Likely", possible: "Possi
 function sampleState() {
   let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
   const p = blankProfile();
-  const L = (name, cat, dose) => { const it = { id: newId(), name, cat, dose: dose || "" }; p.library.push(it); return it; };
+  const L = (name, cat, dose, x) => { const it = { id: newId(), name, cat, dose: dose || "", ...(x ? { x } : {}) }; p.library.push(it); return it; };
   const foods = ["Eggs", "Sourdough toast", "Chicken & rice", "Salmon", "Zucchini", "Blueberries", "Oats", "Coffee", "Garlic", "Onion", "Red wine", "Aged cheddar", "Banana", "Spinach salad"].map(n => L(n, "food"));
-  const [mag, phgg, alli, berb, ginger] = [L("Magnesium citrate", "supp", "300 mg"), L("PHGG", "supp", "5 g"), L("Allicin (Allimed)", "supp", "2 caps 3x/day"), L("Berberine", "supp", "500 mg 2x/day"), L("Ginger + artichoke", "supp", "bedtime")];
+  const [mag, phgg, alli, berb, ginger] = [L("Magnesium citrate", "supp", "300 mg"), L("PHGG", "supp", "5 g"), L("Allicin (Allimed)", "supp", "2 caps", 3), L("Berberine", "supp", "500 mg", 2), L("Ginger + artichoke", "supp", "1 cap")];
   const walk = L("Walk after meals", "practice"), hum = L("Humming / gargling", "practice");
   const start = addDays(todayStr(), -41);
   const protoStart = addDays(start, 15), proki = addDays(start, 34);
@@ -430,7 +430,7 @@ function sampleState() {
   for (let i = 0; i <= 41; i++) {
     const date = addDays(start, i), onP = date >= protoStart, onK = date >= proki;
     const d = { date, items: [], symptoms: {}, bms: [], breath: [], sleep: {}, food: {}, sample: true };
-    const add = it => d.items.push({ id: it.id, dose: it.dose || "", time: "" });
+    const add = it => d.items.push({ id: it.id, dose: it.dose || "", time: "", ...(it.x ? { x: it.x } : {}) });
     [foods[0], foods[7], foods[2]].forEach(add);
     for (let j = 0; j < 3; j++) add(foods[3 + Math.floor(rnd() * 11)]);
     add(mag); if (rnd() > 0.4) add(walk); if (onP) { add(alli); add(berb); add(phgg); } if (onK) add(ginger); if (rnd() > 0.6) add(hum);

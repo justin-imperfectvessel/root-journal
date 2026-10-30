@@ -122,7 +122,7 @@ function submitVoiceSheet(fd) {
         else if (ml) break;
         else if (ex) { if (p.dose) ex.dose = p.dose; if (p.time) ex.time = p.time; Object.assign(ex, qu); }
         else if (it.cat === "food") d.items.push(newFoodEntry(it, date, { time: p.time || "", ...qu }));
-        else d.items.push({ id: it.id, dose: p.dose || it.dose || "", time: p.time || "" });
+        else d.items.push(p.dose ? { id: it.id, dose: p.dose, time: p.time || "" } : suppEntry(it, { time: p.time || "" }));
         break;
       }
       case "sym": d.symptoms[p.k] = p.v; break;

@@ -213,10 +213,12 @@ function viewToday() {
     }
     if (items.length && c.k !== "food") inner += `<div class="row chips-row"><div class="chips">${items.map(i => chip(i, checked.has(i.id))).join("")}</div></div>`;
     if (c.k === "food") inner += foodLogHtml(d);
-    if (on.length && c.k !== "food") inner += on.map(it => `<div class="row dose-row"><span class="row-label">${esc(map[it.id].name)}</span>
+    const doses = c.k === "supp" || c.k === "tx";
+    if (doses) inner += suppRowsHtml(d, c.k) + suppAddRow(c.k);
+    if (on.length && c.k === "practice") inner += on.map(it => `<div class="row dose-row"><span class="row-label">${esc(map[it.id].name)}</span>
       <input id="dose-${it.id}" data-act="dose" data-id="${it.id}" value="${esc(it.dose || "")}" placeholder="Dose" aria-label="Dose for ${esc(map[it.id].name)}">
       <input id="time-${it.id}" type="time" data-act="itime" data-id="${it.id}" value="${esc(it.time || "")}" aria-label="Time taken"></div>`).join("");
-    if (c.k !== "food") inner += `<form class="row add-row" data-act="addItem" data-cat="${c.k}"><input id="add-${c.k}" name="name" placeholder="${c.ph}" autocomplete="off" enterkeyhint="done"><button class="textbtn strong" type="submit">Add</button></form>`;
+    if (c.k === "practice") inner += `<form class="row add-row" data-act="addItem" data-cat="${c.k}"><input id="add-${c.k}" name="name" placeholder="${c.ph}" autocomplete="off" enterkeyhint="done"><button class="textbtn strong" type="submit">Add</button></form>`;
     h += group(`${c.name}${on.length ? ` <span class="gh-meta">${on.length}</span>` : ""}`, inner, c.k === "food" && !(d.meals || []).length ? "Log each meal with its time and what you had. Times show the gaps between meals." : "", "", { food: 145, supp: 265, tx: 220, practice: 75 }[c.k], "sec-" + c.k);
   }
 
@@ -470,6 +472,7 @@ function renderSheet() {
   if (RESULT_SHEETS.includes(s.k)) ({ title, body, form = true, del = "", submitLabel = "" } = resultSheetParts(s));
   else if (s.k === "voice") ({ title, body, submitLabel } = voiceSheetParts(s));
   else if (FOOD_SHEETS.includes(s.k)) ({ title, body, form = true, del = "", submitLabel = "" } = foodSheetParts(s));
+  else if (s.k === "supp") ({ title, body, form = true, del = "", submitLabel = "" } = suppSheetParts(s));
   else if (s.k === "bm") {
     const b = s.bm || { time: new Date().toTimeString().slice(0, 5), bristol: null };
     title = s.bm ? "Bowel movement" : "Add bowel movement";
@@ -567,12 +570,12 @@ document.addEventListener("click", e => {
     case "openDay": UI.date = t.dataset.d; UI.tab = "today"; UI.stack = []; render(); window.scrollTo(0, 0); break;
     case "toggle": {
       const d = touchDay(date), id = t.dataset.id, i = d.items.findIndex(x => x.id === id);
-      if (i >= 0) d.items.splice(i, 1); else d.items.push(map[id] && map[id].cat === "food" ? newFoodEntry(map[id], date) : { id, dose: (map[id] && map[id].dose) || "", time: "" });
+      if (i >= 0) d.items.splice(i, 1); else d.items.push(map[id] && map[id].cat === "food" ? newFoodEntry(map[id], date) : map[id] ? suppEntry(map[id]) : { id, dose: "", time: "" });
       haptic(); commitDay(date, true); break;
     }
     case "checkAll": {
       const p = S.profile.protocols.find(x => x.id === t.dataset.p), d = touchDay(date);
-      p.itemIds.forEach(id => { if (map[id] && !d.items.some(x => x.id === id)) d.items.push({ id, dose: map[id].dose || "", time: "" }); });
+      p.itemIds.forEach(id => { if (map[id] && !d.items.some(x => x.id === id)) d.items.push(suppEntry(map[id])); });
       haptic(); commitDay(date, true); break;
     }
     case "copyPrev": {
@@ -581,7 +584,7 @@ document.addEventListener("click", e => {
         d.meals = prev.meals.map(m => { const id = newId(); prev.items.filter(e => e.mid === m.id && map[e.id] && !map[e.id].hidden).forEach(e => { d.items.push({ ...e, mid: id }); added++; }); return { ...m, id }; });
         syncMealTiming(d);
       }
-      prev.items.forEach(it => { if (!it.mid && !d.items.some(x => x.id === it.id) && map[it.id] && !map[it.id].hidden) { d.items.push({ id: it.id, dose: it.dose || "", time: "", ...(it.q != null ? { q: it.q, u: it.u, meal: it.meal } : {}) }); added++; } });
+      prev.items.forEach(it => { if (!it.mid && !d.items.some(x => x.id === it.id) && map[it.id] && !map[it.id].hidden) { d.items.push({ id: it.id, dose: it.dose || "", time: "", ...(it.x ? { x: it.x } : {}), ...(it.q != null ? { q: it.q, u: it.u, meal: it.meal } : {}) }); added++; } });
       commitDay(date, true); toast(added ? `Added ${added} item${added > 1 ? "s" : ""} from yesterday` : "Everything from yesterday is already checked"); break;
     }
     case "quality": { const d = touchDay(date); d.sleep.quality = d.sleep.quality === Number(t.dataset.v) ? null : Number(t.dataset.v); commitDay(date, true); break; }
@@ -683,6 +686,7 @@ function submitSheet(fd) {
   if (RESULT_SHEETS.includes(s.k)) { submitResultSheet(fd); return; }
   if (s.k === "voice") { submitVoiceSheet(fd); return; }
   if (FOOD_SHEETS.includes(s.k)) { submitFoodSheet(fd); return; }
+  if (s.k === "supp") { submitSuppSheet(fd); return; }
   if (s.k === "bm") {
     const day = touchDay(date), b = s.bm || { id: newId() };
     Object.assign(b, { time: fd.get("time") || "", bristol: fd.get("bristol") ? Number(fd.get("bristol")) : null, size: BM_SIZE[fd.get("size")] ? fd.get("size") : "" });
