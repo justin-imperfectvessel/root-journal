@@ -266,6 +266,7 @@ const RULES = [
   function grazing(X) {
     const { F } = X;
     if (F.relapse === 1 || X.yes("relapse_fast")) return null;
+    if (typeof mealTimedDays === "function" && mealTimedDays(X).length >= 5) return null; // the meal-spacing rule has the real gaps
     const g = (F.grazing || 0) >= 0.5, gap = (F.overnight_gap_short || 0) >= 0.5, sn = X.yes("snacker");
     if (!g && !gap && !sn) return null;
     const ev = [];

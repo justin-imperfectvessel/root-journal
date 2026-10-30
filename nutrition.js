@@ -142,7 +142,7 @@ function resolveQty(it, qty) {
 }
 
 function dayNutrition(d, map = lib()) {
-  const tot = zeroNut(), meals = {};
+  const tot = zeroNut(), meals = {}, byMeal = {};
   let foods = 0, measured = 0;
   for (const e of (d && d.items) || []) {
     const it = map[e.id];
@@ -151,10 +151,11 @@ function dayNutrition(d, map = lib()) {
     const { q, u } = entryQU(e, it), n = nutOf(it, q, u, map), m = entryMeal(e);
     meals[m] ||= { ...zeroNut(), foods: 0 };
     meals[m].foods++;
-    if (n) { measured++; addNut(tot, n); addNut(meals[m], n); }
+    const b = byMeal[e.mid || "t:" + m] ||= zeroNut();
+    if (n) { measured++; addNut(tot, n); addNut(meals[m], n); addNut(b, n); }
   }
-  const mv = Object.values(meals);
-  return { tot, meals, foods, measured, cover: foods ? measured / foods : 0, ok: measured >= 2 && measured / foods >= 0.7,
+  const mv = Object.values(byMeal);
+  return { tot, meals, byMeal, foods, measured, cover: foods ? measured / foods : 0, ok: measured >= 2 && measured / foods >= 0.7,
     maxMealFat: mv.length ? Math.max(...mv.map(m => m.f)) : 0, maxMealKcal: mv.length ? Math.max(...mv.map(m => m.kcal)) : 0 };
 }
 // averages over the days in a window that are mostly measured
@@ -218,26 +219,23 @@ function foodSummaryHtml(d) {
     (!T.kcal ? `<button type="button" class="row action" data-act="push" data-k="nutrition">${icon("plus", "lead")}<span class="row-label">Set your targets</span></button>` : "");
 }
 function foodLogHtml(d) {
-  const map = lib(), on = (d.items || []).filter(e => map[e.id] && map[e.id].cat === "food");
+  const map = lib(), on = (d.items || []).filter(e => map[e.id] && map[e.id].cat === "food" && !e.mid);
   if (!on.length) return "";
   const x = dayNutrition(d, map);
-  return MEALS.map(([k, name]) => {
+  return `<div class="row meal-head"><span class="row-label">Not in a meal yet</span></div>` + MEALS.map(([k, name]) => {
     const es = on.filter(e => entryMeal(e) === k);
     if (!es.length) return "";
-    const m = x.meals[k];
     const rows = es.map(e => {
       const it = map[e.id], { q, u } = entryQU(e, it), n = nutOf(it, q, u, map);
       return `<button type="button" class="row nav food-row" data-act="foodEdit" data-id="${e.id}"><span class="row-main"><span class="row-label">${esc(it.name)}</span>
-        <span class="row-sub">${n ? `${esc(fmtQU(q, u))} · ${fmtN(n.kcal)} kcal · ${fmtN(n.p)} g protein` : "Add nutrition"}${e.time ? ` · ${esc(fmtTime(e.time))}` : ""}</span></span>${icon("chevR", "chev")}</button>`;
+        <span class="row-sub">${n ? `${esc(fmtQU(q, u))} · ${fmtN(n.kcal)} kcal · ${fmtN(n.p)} g protein` : "Add nutrition"}${e.time ? ` · ${esc(fmtTime(e.time))}` : ""} · tap to put in a meal</span></span>${icon("chevR", "chev")}</button>`;
     }).join("");
-    const canSave = k !== "other" && es.length >= 2 && !es.some(e => map[e.id].parts);
-    return `<div class="row meal-head"><span class="row-label">${name}</span><span class="row-value">${m && m.kcal ? `${fmtN(m.kcal)} kcal` : ""}</span></div>${rows}` +
-      (canSave ? `<button type="button" class="row action small" data-act="foodSaveMeal" data-m="${k}"><span class="row-label">Save ${name.toLowerCase()} as a meal</span></button>` : "");
+    return rows;
   }).join("");
 }
 
 // ---------- sheets ----------
-const FOOD_SHEETS = ["foodSearch", "foodEntry", "foodMeal"];
+const FOOD_SHEETS = ["foodSearch", "foodEntry", "foodMeal", "meal", "mealFood"];
 function mealSeg(cur) {
   return `<div class="row field-row"><span class="row-label">Meal</span><span class="seg meal-seg" role="radiogroup">${MEALS.slice(0, 4).map(([k, n]) => `<label><input type="radio" name="meal" value="${k}" ${cur === k ? "checked" : ""}><span>${n === "Snacks" ? "Snack" : n.slice(0, 5) === "Break" ? "Bkfst" : n}</span></label>`).join("")}</span></div>`;
 }
@@ -273,6 +271,7 @@ function foodResultsHtml(s) {
 const hasNutrition = it => !!(it.nut || (it.parts && it.parts.length));
 
 function foodSheetParts(s) {
+  if (s.k === "meal" || s.k === "mealFood") return mealSheetParts(s);
   const map = lib();
   if (s.k === "foodSearch" && s.step === "search") {
     const linkIt = s.link && map[s.link];
@@ -288,8 +287,8 @@ function foodSheetParts(s) {
     return { title: linkIt ? "Add nutrition" : "Add food", submitLabel: linkIt ? "Save" : "Add",
       body: `<p class="sheet-text"><button type="button" class="textbtn" data-act="fsBack">${icon("chevL")} Results</button> ${esc(f.name)}</p>
         <div class="list">${linkIt ? "" : `<label class="row field-row stack" for="fn"><span class="row-label">Name in your journal</span><input id="fn" name="name" required value="${esc(name)}"></label>`}
-        ${amountRows(portions, q, u)}${linkIt ? "" : mealSeg(s.meal || guessMealNow())}
-        ${linkIt ? "" : `<label class="row field-row" for="ft"><span class="row-label">Time</span><input type="time" id="ft" name="time" value=""></label>`}</div>
+        ${amountRows(portions, q, u)}${linkIt || s.fromMeal ? "" : mealSeg(s.meal || guessMealNow())}
+        ${linkIt || s.fromMeal ? "" : `<label class="row field-row" for="ft"><span class="row-label">Time</span><input type="time" id="ft" name="time" value=""></label>`}</div>
         <div class="list">${previewHtml(it, q, u)}</div><p class="footnote">This becomes your usual portion, so next time one tap logs it.</p>` };
   }
   if (s.k === "foodSearch" && s.step === "label") {
@@ -301,10 +300,10 @@ function foodSheetParts(s) {
         <label class="row field-row stack" for="lb-serv"><span class="row-label">Serving</span><input id="lb-serv" name="serv" value="serving" placeholder="e.g. bar, cup, 2 crackers"></label>
         ${fld("g", "Serving weight", "g", false)}</div>
         <div class="list">${fld("kcal", "Calories", "kcal", true)}${fld("p", "Protein", "g")}${fld("f", "Fat", "g")}${fld("c", "Carbs", "g")}${fld("fib", "Fiber", "g")}${fld("sug", "Sugars", "g")}${fld("sat", "Saturated fat", "g")}</div>
-        <div class="list"><label class="row field-row" for="lb-q"><span class="row-label">Servings eaten</span><input type="number" id="lb-q" name="q" value="1" min="0" step="any" inputmode="decimal"></label>${linkIt ? "" : mealSeg(guessMealNow())}</div>` };
+        <div class="list"><label class="row field-row" for="lb-q"><span class="row-label">Servings eaten</span><input type="number" id="lb-q" name="q" value="1" min="0" step="any" inputmode="decimal"></label>${linkIt || s.fromMeal ? "" : mealSeg(guessMealNow())}</div>` };
   }
   if (s.k === "foodEntry") {
-    const d = getDay(s.date || UI.date) || { items: [] }, e = d.items.find(x => x.id === s.id), it = map[s.id];
+    const d = getDay(s.date || UI.date) || { items: [] }, e = d.items.find(x => x.id === s.id && !x.mid), it = map[s.id];
     if (!e || !it) return { title: "Food", form: false, body: `<p class="sheet-text">This entry was removed.</p>` };
     const { q, u } = entryQU(e, it), portions = it.parts ? [["1 meal", null]] : [...(it.portions || []), ["g", 1]];
     return { title: it.name, submitLabel: "Save",
@@ -316,7 +315,7 @@ function foodSheetParts(s) {
       del: `<button type="button" class="btn destructive block" data-act="foodDel" data-id="${it.id}">Remove from this day</button>` };
   }
   if (s.k === "foodMeal") {
-    const d = getDay(UI.date), es = d.items.filter(e => map[e.id] && map[e.id].cat === "food" && entryMeal(e) === s.meal);
+    const es = s.parts || getDay(UI.date).items.filter(e => map[e.id] && map[e.id].cat === "food" && entryMeal(e) === s.meal);
     return { title: "Save as a meal", submitLabel: "Save",
       body: `<div class="list"><label class="row field-row stack" for="mn"><span class="row-label">Name</span><input id="mn" name="name" required value="Usual ${esc(MEAL_NAME[s.meal].toLowerCase().replace(/s$/, ""))}"></label></div>
         <div class="list">${es.map(e => { const it = map[e.id], { q, u } = entryQU(e, it); return `<div class="row"><span class="row-label">${esc(it.name)}</span><span class="row-value">${esc(fmtQU(q, u))}</span></div>`; }).join("")}</div>
@@ -326,7 +325,7 @@ function foodSheetParts(s) {
 function guessMealNow() { return UI.date === todayStr() ? mealAt(nowHours()) : "other"; }
 
 function logFood(it, opt) {
-  const date = UI.date, d = touchDay(date), i = d.items.findIndex(x => x.id === it.id);
+  const date = UI.date, d = touchDay(date), i = d.items.findIndex(x => x.id === it.id && !x.mid);
   const e = newFoodEntry(it, date, opt);
   if (i >= 0) d.items[i] = { ...d.items[i], ...e }; else d.items.push(e);
   if (opt && opt.meal) it.meal = opt.meal;
@@ -334,12 +333,14 @@ function logFood(it, opt) {
 }
 function submitFoodSheet(fd) {
   const s = UI.sheet, map = lib();
+  if (s.k === "meal" || s.k === "mealFood") { submitMealSheet(fd); return; }
   const meal = fd.get("meal") || undefined, time = fd.get("time") || "";
   if (s.k === "foodSearch" && s.step === "pick") {
     const f = s.f, q = num(fd.get("q")) ?? 1, u = fd.get("u");
     const it = s.link ? map[s.link] : addLibraryItem(String(fd.get("name") || f.name), "food");
     Object.assign(it, { nut: f.nut, portions: f.portions, fdc: f.fdc, src: "usda", usdaName: f.name, usual: { q, u } });
-    if (s.link) { Store.saveProfile(); closeSheet(); render(); toast("Nutrition added. Past entries use your usual portion."); return; }
+    if (s.link) { Store.saveProfile(); if (s.back) { mealReturn(); return; } closeSheet(); render(); toast("Nutrition added. Past entries use your usual portion."); return; }
+    if (s.back) { Store.saveProfile(); addToDraft(s.back.draft, it, { q, u }); s.back.q = ""; mealReturn(); return; }
     logFood(it, { q, u, meal, time }); closeSheet(); render(); return;
   }
   if (s.k === "foodSearch" && s.step === "label") {
@@ -351,30 +352,35 @@ function submitFoodSheet(fd) {
     const it = s.link ? map[s.link] : addLibraryItem(String(fd.get("name") || s.q || "Food"), "food");
     Object.assign(it, { nut, portions: [[label, base]], src: "label", usual: { q, u: label } });
     delete it.fdc; delete it.usdaName;
-    if (s.link) { Store.saveProfile(); closeSheet(); render(); toast("Nutrition added"); return; }
+    if (s.link) { Store.saveProfile(); if (s.back) { mealReturn(); return; } closeSheet(); render(); toast("Nutrition added"); return; }
+    if (s.back) { Store.saveProfile(); addToDraft(s.back.draft, it, { q, u: label }); s.back.q = ""; mealReturn(); return; }
     logFood(it, { q, u: label, meal, time }); closeSheet(); render(); return;
   }
   if (s.k === "foodEntry") {
-    const date = s.date || UI.date, d = touchDay(date), e = d.items.find(x => x.id === s.id), it = map[s.id];
+    const date = s.date || UI.date, d = touchDay(date), e = d.items.find(x => x.id === s.id && !x.mid), it = map[s.id];
     if (!e || !it) { closeSheet(); return; }
     if (fd.get("q") != null) { e.q = num(fd.get("q")) ?? e.q; e.u = fd.get("u") || e.u; it.usual = { q: e.q, u: e.u }; }
     if (meal) { e.meal = meal; it.meal = meal; }
     e.time = time;
+    // choosing a meal puts a loose food into that meal
+    if (meal && meal !== "other" && !d.items.some(x => x.id === e.id && x.mid && (d.meals || []).some(m => m.id === x.mid && m.type === meal))) { e.mid = mealFor(d, meal, time).id; e.time = ""; syncMealTiming(d); }
     Store.saveProfile(); commitDay(date); closeSheet(); render(); return;
   }
   if (s.k === "foodMeal") {
-    const d = getDay(UI.date), es = d.items.filter(e => map[e.id] && map[e.id].cat === "food" && entryMeal(e) === s.meal && !map[e.id].parts);
+    const es = (s.parts || getDay(UI.date).items.filter(e => map[e.id] && map[e.id].cat === "food" && entryMeal(e) === s.meal)).filter(e => map[e.id] && !map[e.id].parts);
     const name = String(fd.get("name") || "").trim() || "Usual meal";
     const it = addLibraryItem(name, "food");
     Object.assign(it, { parts: es.map(e => ({ id: e.id, ...entryQU(e, map[e.id]) })), usual: { q: 1, u: "1 meal" }, meal: s.meal });
-    Store.saveProfile(); closeSheet(); render(); toast(`Saved "${name}". Tomorrow, one tap logs it.`);
+    Store.saveProfile();
+    if (s.back) { mealReturn(); toast(`Saved "${name}". Next time, add it from Your foods.`); return; }
+    closeSheet(); render(); toast(`Saved "${name}". Tomorrow, one tap logs it.`);
   }
 }
 
 function refreshPreview() {
   const s = UI.sheet, box = $("#fe-prev");
   if (!s || !box) return;
-  const it = s.k === "foodEntry" ? lib()[s.id] : draftItem(s);
+  const it = s.k === "foodEntry" ? lib()[s.id] : s.k === "mealFood" ? lib()[(s.back.draft.foods[s.i] || {}).id] : draftItem(s);
   const q = num(($("#fq") || {}).value) ?? 0, u = ($("#fu") || {}).value;
   if (it && u) box.outerHTML = previewHtml(it, q, u);
 }
@@ -398,12 +404,12 @@ document.addEventListener("click", e => {
       break;
     }
     case "fsPick": if (s && s.results) { s.f = s.results[Number(t.dataset.i)]; s.step = "pick"; s.u = s.qv = s.name = undefined; renderSheet(); } break;
-    case "fsBack": if (s) { s.step = "search"; renderSheet(); const i = $("#fs-q"); if (i) i.focus(); } break;
+    case "fsBack": if (s && s.back) { mealReturn(); break; } if (s) { s.step = "search"; renderSheet(); const i = $("#fs-q"); if (i) i.focus(); } break;
     case "fsLabel": if (s) { s.step = "label"; renderSheet(); } break;
     case "fsLib": { const it = map[t.dataset.id]; if (!it) break; logFood(it, {}); closeSheet(); render(); break; }
     case "fsPlain": { const it = addLibraryItem(s.q, "food"); if (it) { logFood(it, {}); closeSheet(); render(); toast("Added. Tap it on Today to add nutrition later."); } break; }
     case "foodEdit": openSheet({ k: "foodEntry", id: t.dataset.id, date: UI.date }); break;
-    case "foodDel": { const d = touchDay(UI.date); d.items = d.items.filter(x => x.id !== t.dataset.id); commitDay(UI.date); closeSheet(); render(); break; }
+    case "foodDel": { const d = touchDay(UI.date); d.items = d.items.filter(x => x.id !== t.dataset.id || x.mid); commitDay(UI.date); closeSheet(); render(); break; }
     case "foodSaveMeal": openSheet({ k: "foodMeal", meal: t.dataset.m }); break;
     case "qtyStep": {
       const i = $("#fq"); if (!i) break;
@@ -608,7 +614,19 @@ sampleState = function () {
     it.meal = u ? u[2] : "dinner";
   }
   const map = Object.fromEntries(st.profile.library.map(i => [i.id, i]));
-  for (const d of Object.values(st.days)) for (const e of d.items) { const it = map[e.id]; if (it && it.cat === "food") e.meal = it.meal; }
+  for (const d of Object.values(st.days)) {
+    // sample meals: breakfast at 8, lunch, an afternoon snack, dinner at the day's last bite
+    d.items = d.items.filter((e, i, a) => a.findIndex(x => x.id === e.id) === i);
+    const at = { breakfast: "08:00", lunch: "12:30", snack: "15:30", dinner: d.food.last || "19:00" }, ms = {};
+    for (const e of d.items) {
+      const it = map[e.id]; if (!it || it.cat !== "food") continue;
+      e.meal = it.meal;
+      ms[e.meal] ||= { id: newId(), type: e.meal, time: at[e.meal] };
+      e.mid = ms[e.meal].id;
+    }
+    d.meals = Object.values(ms);
+    if (d.meals.length) { delete d.food.first; delete d.food.last; syncMealTiming(d); }
+  }
   Object.assign(st.profile, { body: { units: "us", sex: "f", age: 34, h: 165, w: 59, act: "light" } });
   return st;
 };

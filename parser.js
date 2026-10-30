@@ -354,8 +354,9 @@
       const lastS = sents.find(s => /\b(last (?:bite|meal|ate)|stopped eating|dinner|supper|finished eating)\b/.test(s) && findTime(s, "dinner"));
       const foodTimes = proposals.filter(p => p.kind === "item" && p.cat === "food" && p.time).map(p => p.time).sort();
       const first = firstS ? findTime(firstS, "breakfast") : foodTimes[0], last = lastS ? findTime(lastS, "dinner") : foodTimes.length > 1 ? foodTimes[foodTimes.length - 1] : null;
-      if (first) add({ kind: "food", f: "first", v: first, uncertain: !firstS, why: firstS ? "" : "Earliest food time you mentioned" });
-      if (last && last !== first) add({ kind: "food", f: "last", v: last, uncertain: !lastS, why: lastS ? "" : "Latest food time you mentioned" });
+      // foods with times become meals, so only a first or last bite you said outright is kept
+      if (first && firstS) add({ kind: "food", f: "first", v: first });
+      if (last && lastS && last !== first) add({ kind: "food", f: "last", v: last });
       if (firstS) markSent(firstS); if (lastS) markSent(lastS);
     }
 

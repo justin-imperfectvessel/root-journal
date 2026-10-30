@@ -202,7 +202,7 @@ function thresholds() {
 function expandIds(d, map) {
   const out = [];
   for (const e of d.items || []) { out.push(e.id); const it = map[e.id]; if (it && it.parts) it.parts.forEach(p => out.push(p.id)); }
-  return out;
+  return [...new Set(out)];
 }
 function itemNames(d, map) { return expandIds(d, map).map(id => map[id]).filter(Boolean); }
 

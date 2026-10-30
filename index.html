@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-10-30 11:21";</script>
+<script>window.APP_BUILD = "2026-10-30 12:57";</script>
 <title>SIBO Root Journal</title>
 <meta name="description" content="Daily SIBO/IMO journal with tap-to-log checkboxes, FoodMarble tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -362,6 +362,16 @@ svg .bsdot.b1, svg .bsdot.b2 { fill: var(--ink); } svg .bsdot.b3, svg .bsdot.b4 
 .nbar i { display: block; height: 100%; background: var(--deep); border-radius: 999px; }
 .nbar.limit i { background: var(--ink-3); }
 .compact .nbar { height: 6px; }
+.meal-card .row-label { font-weight: 800; }
+.meal-time { font-weight: 600; color: var(--ink-2); margin-left: 4px; }
+.meal-card .row-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meal-card .row-main { min-width: 0; }
+.gap-row { justify-content: center; padding-top: 6px; padding-bottom: 6px; min-height: 0; }
+.gap-row span { font-size: 12px; font-weight: 700; color: var(--ink-2); letter-spacing: .02em; }
+.gap-row.short span::after { content: " · short"; }
+.gap-row.good span::after { content: " ✓"; }
+.meal-add { display: flex; flex-wrap: wrap; gap: 8px; }
+.meal-add .chip { min-height: 34px; padding: 5px 13px 5px 12px; }
 .meal-head { padding-top: 14px; padding-bottom: 4px; }
 .meal-head .row-label { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .meal-head .row-value { font-size: 13px; font-weight: 700; }
@@ -525,6 +535,7 @@ input.filled { background: var(--pop) !important; border-radius: 6px; padding: 2
 <script src="ui.js"></script>
 <script src="insights.js"></script>
 <script src="nutrition.js"></script>
+<script src="meals.js"></script>
 <script src="results.js"></script>
 <script src="voice.js"></script>
 

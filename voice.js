@@ -115,8 +115,12 @@ function submitVoiceSheet(fd) {
         const it = p.id ? map[p.id] : addLibraryItem(p.newName, p.cat);
         if (!it) break;
         if (p.dose) it.dose = p.dose;
-        const ex = d.items.find(x => x.id === it.id), qu = it.cat === "food" ? resolveQty(it, p.qty) : {};
-        if (ex) { if (p.dose) ex.dose = p.dose; if (p.time) ex.time = p.time; Object.assign(ex, qu); }
+        const ex = d.items.find(x => x.id === it.id && !x.mid), qu = it.cat === "food" ? resolveQty(it, p.qty) : {};
+        // a food with a time goes into the meal at that time
+        const ml = it.cat === "food" && p.time ? mealFor(d, mealAt(hrs(p.time)), p.time) : null;
+        if (ml && !d.items.some(x => x.id === it.id && x.mid === ml.id)) { if (ex) d.items.splice(d.items.indexOf(ex), 1); d.items.push({ ...newFoodEntry(it, date, { ...qu, meal: ml.type }), mid: ml.id }); }
+        else if (ml) break;
+        else if (ex) { if (p.dose) ex.dose = p.dose; if (p.time) ex.time = p.time; Object.assign(ex, qu); }
         else if (it.cat === "food") d.items.push(newFoodEntry(it, date, { time: p.time || "", ...qu }));
         else d.items.push({ id: it.id, dose: p.dose || it.dose || "", time: p.time || "" });
         break;
@@ -134,6 +138,7 @@ function submitVoiceSheet(fd) {
   }
   const notes = s.unparsed.filter((u, i) => s.notes[i]);
   if (notes.length) { d.notes = [d.notes, ...notes.map(x => x.charAt(0).toUpperCase() + x.slice(1))].filter(Boolean).join("\n"); n += notes.length; }
+  syncMealTiming(d);
   d.bms.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   d.breath.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   s.text = ""; s.proposals = []; s.unparsed = [];

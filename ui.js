@@ -62,7 +62,7 @@ function goBack() {
   onBack();
 }
 function onBack() {
-  if (UI.sheet) { UI.sheet = null; renderSheet(); return; }
+  if (UI.sheet) { UI.sheet = UI.sheet.back || null; renderSheet(); return; }
   if (UI.stack.length) { UI.stack.pop(); render(); }
 }
 window.addEventListener("popstate", onBack);
@@ -204,20 +204,15 @@ function viewToday() {
     const on = d.items.filter(it => map[it.id] && map[it.id].cat === c.k);
     let inner = "";
     if (c.k === "food") {
-      inner += foodSummaryHtml(d);
-      inner += `<div class="row fields3">
-        <label><span>First bite</span><input type="time" id="food-first" data-act="food" data-f="first" value="${esc(d.food.first || "")}"></label>
-        <label><span>Last bite</span><input type="time" id="food-last" data-act="food" data-f="last" value="${esc(d.food.last || "")}"></label>
-        <label><span>Meals + snacks</span><input type="number" min="0" max="15" inputmode="numeric" id="food-count" data-act="food" data-f="count" value="${esc(d.food.count ?? "")}" placeholder="0"></label></div>`;
+      inner += foodSummaryHtml(d) + mealsHtml(d, date);
     }
-    if (items.length) inner += `<div class="row chips-row"><div class="chips">${items.map(i => chip(i, checked.has(i.id))).join("")}</div></div>`;
+    if (items.length && c.k !== "food") inner += `<div class="row chips-row"><div class="chips">${items.map(i => chip(i, checked.has(i.id))).join("")}</div></div>`;
     if (c.k === "food") inner += foodLogHtml(d);
     if (on.length && c.k !== "food") inner += on.map(it => `<div class="row dose-row"><span class="row-label">${esc(map[it.id].name)}</span>
       <input id="dose-${it.id}" data-act="dose" data-id="${it.id}" value="${esc(it.dose || "")}" placeholder="Dose" aria-label="Dose for ${esc(map[it.id].name)}">
       <input id="time-${it.id}" type="time" data-act="itime" data-id="${it.id}" value="${esc(it.time || "")}" aria-label="Time taken"></div>`).join("");
-    if (c.k === "food") inner += actionRow("Add food", "foodAdd");
-    else inner += `<form class="row add-row" data-act="addItem" data-cat="${c.k}"><input id="add-${c.k}" name="name" placeholder="${c.ph}" autocomplete="off" enterkeyhint="done"><button class="textbtn strong" type="submit">Add</button></form>`;
-    h += group(`${c.name}${on.length ? ` <span class="gh-meta">${on.length}</span>` : ""}`, inner, c.k === "food" && !items.length ? "Search 5,000+ foods with USDA nutrition, or add your own. Each food remembers your usual portion." : "", "", { food: 145, supp: 265, tx: 220, practice: 75 }[c.k], "sec-" + c.k);
+    if (c.k !== "food") inner += `<form class="row add-row" data-act="addItem" data-cat="${c.k}"><input id="add-${c.k}" name="name" placeholder="${c.ph}" autocomplete="off" enterkeyhint="done"><button class="textbtn strong" type="submit">Add</button></form>`;
+    h += group(`${c.name}${on.length ? ` <span class="gh-meta">${on.length}</span>` : ""}`, inner, c.k === "food" && !(d.meals || []).length ? "Log each meal with its time and what you had. Times show the gaps between meals." : "", "", { food: 145, supp: 265, tx: 220, practice: 75 }[c.k], "sec-" + c.k);
   }
 
   // symptoms
@@ -278,6 +273,7 @@ function viewTrends() {
   const sized = span.flatMap(d => S.days[d] ? S.days[d].bms : []).filter(b => BM_SIZE[b.size]);
   const sizeNote = sized.length ? ` Size: ${Object.entries(BM_SIZE).map(([k, [n]]) => `${sized.filter(b => b.size === k).length} ${n.toLowerCase()}`).join(" · ")}.` : "";
   h += group("Stool form", `<div class="row chart-row">${bristolChart(span)}</div>`, "Bristol type for each BM. Types 3 and 4 are the target band." + sizeNote);
+  h += trendsMealsHtml(span);
   h += trendsNutritionHtml();
   h += group("Recent days", dates.slice(-10).reverse().map(dt => { const d = S.days[dt]; return navRow({ label: esc(fmtDate(dt)), sub: esc([`${d.items.length} items`, d.noBM ? "no BM" : d.bms.length ? `BM ${d.bms.map(x => x.bristol || "?").join(", ")}` : "", d.breath.length ? `${d.breath.length} breath` : ""].filter(Boolean).join(" · ")), value: dayScore(d) == null ? "" : `<span class="score-chip">${r1(dayScore(d))}</span>`, act: "openDay", attrs: `data-d="${dt}"` }); }).join(""));
   return h;
@@ -577,7 +573,11 @@ document.addEventListener("click", e => {
     }
     case "copyPrev": {
       const prev = getDay(addDays(date, -1)), d = touchDay(date); let added = 0;
-      prev.items.forEach(it => { if (!d.items.some(x => x.id === it.id) && map[it.id] && !map[it.id].hidden) { d.items.push({ id: it.id, dose: it.dose || "", time: "", ...(it.q != null ? { q: it.q, u: it.u, meal: it.meal } : {}) }); added++; } });
+      if (prev.meals && prev.meals.length && !(d.meals || []).length) {
+        d.meals = prev.meals.map(m => { const id = newId(); prev.items.filter(e => e.mid === m.id && map[e.id] && !map[e.id].hidden).forEach(e => { d.items.push({ ...e, mid: id }); added++; }); return { ...m, id }; });
+        syncMealTiming(d);
+      }
+      prev.items.forEach(it => { if (!it.mid && !d.items.some(x => x.id === it.id) && map[it.id] && !map[it.id].hidden) { d.items.push({ id: it.id, dose: it.dose || "", time: "", ...(it.q != null ? { q: it.q, u: it.u, meal: it.meal } : {}) }); added++; } });
       commitDay(date, true); toast(added ? `Added ${added} item${added > 1 ? "s" : ""} from yesterday` : "Everything from yesterday is already checked"); break;
     }
     case "quality": { const d = touchDay(date); d.sleep.quality = d.sleep.quality === Number(t.dataset.v) ? null : Number(t.dataset.v); commitDay(date, true); break; }
@@ -722,6 +722,9 @@ function aiSummary() {
     topDrivers: ranked.map(r => ({ name: r.d.name, match: LEVEL_LABEL[r.level], points: Math.round(r.pts * 10) / 10, evidence: r.why.map(w => w.label) })),
     beforeWorseDays: A.correlations.filter(c => c.lift >= 0.7).slice(0, 6).map(c => `${c.it.name} (+${r1(c.lift)})`),
     beforeBetterDays: A.correlations.filter(c => c.lift <= -0.7).slice(-6).map(c => `${c.it.name} (${r1(c.lift)})`),
+    mealTiming14d: (() => { const ds = Array.from({ length: 14 }, (_, i) => addDays(todayStr(), -i)).filter(dt => S.days[dt] && timedMeals(S.days[dt]).length); if (ds.length < 3) return undefined;
+      const g = ds.flatMap(dt => mealGapsOf(S.days[dt])), n = ds.map(overnightFast).filter(v => v != null);
+      return { daysWithMealTimes: ds.length, mealsPerDay: r1(ds.reduce((a, dt) => a + S.days[dt].meals.length, 0) / ds.length), typicalGapHours: g.length ? r1(median(g)) : undefined, gapsUnder3h: g.filter(x => x < 3).length + " of " + g.length, typicalOvernightFastHours: n.length ? r1(median(n)) : undefined }; })(),
     nutrition14d: (() => { const a = nutritionAverage(14), { T } = nutritionTargets(); return a && { measuredDays: a.days, average: Object.fromEntries(NUT_KEYS.map(k => [NUT_INFO[k][0] + " (" + NUT_INFO[k][1] + ")", Math.round(a.avg[k] * 10) / 10])), targets: Object.fromEntries(MACROS.map(k => [NUT_INFO[k][0], T[k]])) }; })(),
     insights: buildInsights().list.filter(x => x.kind !== "gap").slice(0, 8).map(x => ({ finding: x.title, type: x.kind, confidence: x.conf || "", evidence: x.evidence.map(e => e[1]), test: x.result ? x.result.text : undefined })),
     protocols: A.protoStats.map(({ p, s }) => ({ name: p.name, type: p.kind, start: p.start, end: p.end || "ongoing", items: p.itemIds.map(id => A.map[id] && A.map[id].name).filter(Boolean), before: r1(s.base.mean), during: r1(s.during.mean), last7: r1(s.late.mean), after: r1(s.after.mean), verdict: s.verdict })),
