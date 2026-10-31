@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-10-30 18:00";</script>
+<script>window.APP_BUILD = "2026-10-30 20:15";</script>
 <title>SIBO Root Journal</title>
 <meta name="description" content="Daily SIBO/IMO journal with tap-to-log checkboxes, FoodMarble tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -410,7 +410,7 @@ svg .bsdot.b1, svg .bsdot.b2 { fill: var(--ink); } svg .bsdot.b3, svg .bsdot.b4 
 .sheet { position: fixed; z-index: 41; left: 0; right: 0; bottom: 0; max-height: calc(100% - env(safe-area-inset-top, 0px) - 24px); display: flex; flex-direction: column;
   background: var(--paper); border-top: var(--line) solid var(--ink); border-radius: 18px 18px 0 0; animation: rise .28s cubic-bezier(.2, .9, .3, 1); outline: 0; }
 .grabber { width: 40px; height: 5px; border-radius: 3px; background: var(--ink); margin: 7px auto 0; flex: none; }
-.sheet-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; padding: 4px max(14px, env(safe-area-inset-right, 0px)) 6px max(14px, env(safe-area-inset-left, 0px)); flex: none; }
+.sheet-head { display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr); column-gap: 8px; align-items: center; padding: 4px max(14px, env(safe-area-inset-right, 0px)) 6px max(14px, env(safe-area-inset-left, 0px)); flex: none; }
 .sheet-head h2 { font-family: var(--display); font-weight: 400; font-size: 26px; line-height: 1; padding-top: 3px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sheet-head > :first-child { justify-self: start; } .sheet-head > :last-child { justify-self: end; }
 .sheet-head button[type=submit] { background: var(--ink); color: var(--paper); border-radius: 999px; padding: 6px 16px; }
@@ -419,11 +419,11 @@ svg .bsdot.b1, svg .bsdot.b2 { fill: var(--ink); } svg .bsdot.b3, svg .bsdot.b4 
 .sheet-body .list + .list { margin-top: 0; }
 .sheet-h3 { font-size: 17px; font-weight: 700; margin: 0 2px 9px; }
 .sheet-text { font-size: 16px; color: var(--ink-2); margin: 6px 2px 20px; line-height: 1.5; }
-.bristol-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-bottom: 16px; }
+.bristol-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
 .bt { display: grid; justify-items: center; align-content: start; gap: 5px; padding: 10px 2px; border-radius: var(--r-sm); border: var(--line) solid var(--ink); background: var(--paper); cursor: pointer; text-align: center; }
 .bt input { position: absolute; opacity: 0; pointer-events: none; }
 .bt-n { font-family: var(--display); font-size: 30px; line-height: 1; padding-top: 2px; }
-.bt-l { font-size: 11px; color: var(--ink-2); line-height: 1.2; font-weight: 600; }
+.bt-l { font-size: 12px; color: var(--ink-2); line-height: 1.25; font-weight: 600; overflow-wrap: break-word; max-width: 100%; }
 .bt:has(input:checked) { background: var(--ink); color: var(--paper); }
 .bt:has(input:checked) .bt-l { color: var(--paper); }
 .bt:has(input:focus-visible) { outline: 2.5px solid var(--ink); outline-offset: 2px; }
@@ -507,8 +507,8 @@ input.filled { background: var(--pop) !important; border-radius: 6px; padding: 2
   .large-title h1 { font-size: 48px; }
   .compare { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 10px; }
   .fields3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bt-l { display: none; }
   .mood span { font-size: 12px; }
+  .sheet-head h2 { font-size: 22px; }
 }
 @media (min-width: 900px) {
   #tabbar { top: 0; right: auto; width: 92px; grid-template-columns: none; grid-auto-rows: 76px; align-content: start; padding: calc(env(safe-area-inset-top, 0px) + 60px) 0 0 env(safe-area-inset-left, 0px); border-top: 0; border-right: var(--line) solid var(--ink); }
