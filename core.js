@@ -38,6 +38,10 @@ const CATS = [
 const BRISTOL = ["", "Hard lumps", "Lumpy sausage", "Cracked sausage", "Smooth, soft", "Soft blobs", "Mushy", "Watery"];
 // Stool amount by volume, as on clinical bowel records (a cup is about a fist)
 const BM_SIZE = { s: ["Small", "Under ½ cup"], m: ["Medium", "½ to 1 cup"], l: ["Large", "Over 1 cup"] };
+// BM flags: [key, switch label, short label]
+const BM_FLAGS = [["urgency", "Urgent", "urgent"], ["incomplete", "Incomplete", "incomplete"], ["straining", "Straining", "straining"], ["enema", "Needed an enema", "after an enema"],
+  ["mucus", "Mucus", "mucus"], ["floating", "Floating or oily", "floating or oily"], ["blood", "Blood", "blood"]];
+const bmFlagText = b => BM_FLAGS.filter(([k]) => b[k]).map(f => f[2]);
 const PROTO_KINDS = [["antimicrobial", "Antimicrobial"], ["prokinetic", "Prokinetic"], ["diet", "Diet"], ["support", "Support / supplements"], ["lifestyle", "Lifestyle / nervous system"], ["other", "Other experiment"]];
 const CHALLENGES = ["", "Meal", "Lactulose", "Glucose", "Inulin", "Fructose", "Lactose", "Sorbitol"];
 
@@ -276,7 +280,7 @@ function analyze() {
   // BMs
   const bmDays = days.filter(d => d.bms.length || d.noBM);
   if (bmDays.length >= 5) {
-    F.constipation = clamp(bmDays.filter(d => d.noBM || d.bms.some(b => b.bristol && b.bristol <= 2)).length / bmDays.length / 0.5);
+    F.constipation = clamp(bmDays.filter(d => d.noBM || d.bms.some(b => (b.bristol && b.bristol <= 2) || b.enema)).length / bmDays.length / 0.5);
     F.diarrhea = clamp(bmDays.filter(d => d.bms.some(b => b.bristol >= 6)).length / bmDays.length / 0.4);
     const bms = bmDays.flatMap(d => d.bms);
     if (bms.length >= 5) F.incomplete = clamp(bms.filter(b => b.incomplete || b.straining).length / bms.length / 0.5);

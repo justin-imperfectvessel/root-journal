@@ -78,7 +78,7 @@
 
   // Words that end a food or supplement list, and words that are never an item.
   const LIST_END = /\b(for (?:breakfast|lunch|dinner|a snack)|at|around|about|by|but|because|which|that|so|after|before|this|today|tonight|this morning|this afternoon|this evening|last night|yesterday|in the|felt|feeling|and felt|it|which made|was|were)\b|[.;!?]/;
-  const NOT_ITEM = /^(it|that|this|them|the|a|an|my|your|some|nothing|a lot|lots|much|food|stuff|something|anything|everything|breakfast|lunch|dinner|snack|snacks|meal|meals|a meal|my meal|my supplements|my meds|supplements|meds|medication|bm|a bm|bms|sleep|stress|pain|gas|bloating|period|my period|\d+.*|fun|time|day|enough|a good day|a bad day|a rough day|a great day|(?:type|bristol) \d.*)$/;
+  const NOT_ITEM = /^(it|that|this|them|the|a|an|my|your|some|nothing|a lot|lots|much|food|stuff|something|anything|everything|breakfast|lunch|dinner|snack|snacks|meal|meals|a meal|my meal|my supplements|my meds|supplements|meds|medication|bm|a bm|bms|sleep|stress|pain|gas|bloating|period|my period|\d+.*|fun|time|day|enough|a good day|a bad day|a rough day|a great day|(?:type|bristol) \d.*|(?:an? |my )?enemas?\b.*)$/;
   const CLEAN = /^(?:(?:a|an|the|some|my|of|more|another|bit of|little|small|large|big|bowl of|cup of|cups of|glass of|slice of|slices of|piece of|pieces of|handful of|plate of|serving of|scoop of|few|couple(?: of)?|\d+(?:\.\d+)?|half|extra)\s+)+/;
   const DOSE = /(\d+(?:\.\d+)?)\s?(mg|mcg|µg|g|grams?|iu|ml|caps?|capsules?|tablets?|tabs?|pills?|drops?|scoops?|tsp|tbsp)\b/;
   // food amounts: "2 slices of", "200 grams", "a cup of", "half a"
@@ -265,7 +265,7 @@
     }
 
     // ---- bowel movements ----
-    const BMW = /\b(bms?|bowel movements?|poop(?:ed|s)?|pooped|stools?|went to the bathroom|number two|movement)\b/;
+    const BMW = /\b(enemas?|bms?|bowel movements?|poop(?:ed|s)?|pooped|stools?|went to the bathroom|number two|movement)\b/;
     if (/\b(no|didn't have (?:a|any)|didn't|did not|haven't had (?:a|any)?|zero)\s+(?:\w+\s+)?(bms?|bowel movements?|poop|poo)\b|\bdidn't (?:go|poop)\b/.test(t)) {
       add({ kind: "nobm" });
       sents.forEach((s, i) => { if (BMW.test(s) || /didn't (?:go|poop)/.test(s)) sentHit[i] = true; });
@@ -282,7 +282,7 @@
         if (ty && Number(ty[1]) >= 1 && Number(ty[1]) <= 7) bristol = Number(ty[1]);
         else for (const [re, v] of BRISTOL) if (re.test(s)) { bristol = v; break; }
         const flags = { urgency: /\burgen(?:t|cy)|rushed|had to run\b/.test(s), incomplete: /\bincomplete|not complete|didn't feel (?:empty|done|finished)|unfinished\b/.test(s),
-          straining: /\bstrain(?:ed|ing)?|pushing|hard to go\b/.test(s), mucus: /\bmucus\b/.test(s), floating: /\bfloat(?:ing|ed|y)?|oily|greasy\b/.test(s), blood: /\bblood(?:y)?\b/.test(s) };
+          straining: /\bstrain(?:ed|ing)?|pushing|hard to go\b/.test(s), mucus: /\bmucus\b/.test(s), floating: /\bfloat(?:ing|ed|y)?|oily|greasy\b/.test(s), blood: /\bblood(?:y)?\b/.test(s), enema: /\benemas?\b/.test(s) };
         const size = /\b(?:small|tiny|not much|barely anything)\b/.test(s) ? "s" : /\b(?:big|large|huge|massive|enormous)\b/.test(s) ? "l" : /\b(?:medium|normal size|average)\b/.test(s) ? "m" : "";
         const time = findTime(s);
         if (extra && !/\b(one|1|bm|poop|movement|stool)\b/.test(s)) continue;

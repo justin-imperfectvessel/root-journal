@@ -36,7 +36,7 @@ function reportDayLines(date, map) {
   }
   if (d.noBM) L.push("- Bowel movements: none");
   for (const b of d.bms) {
-    const flags = [["urgency", "urgent"], ["incomplete", "incomplete"], ["straining", "straining"], ["mucus", "mucus"], ["floating", "floating or oily"], ["blood", "blood"]].filter(([k]) => b[k]).map(f => f[1]);
+    const flags = bmFlagText(b);
     L.push(`- BM${b.time ? ` ${b.time}` : ""}: ${b.bristol ? `Bristol ${b.bristol} (${BRISTOL[b.bristol].toLowerCase()})` : "Bristol not given"}${b.size ? `, ${BM_SIZE[b.size][0].toLowerCase()} (${BM_SIZE[b.size][1].toLowerCase()})` : ""}${flags.length ? `, ${flags.join(", ")}` : ""}`);
   }
   const unit = S.profile.settings.unit === "ppm" ? "ppm" : "level";

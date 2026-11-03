@@ -233,7 +233,7 @@ function viewToday() {
 
   // BMs
   const bmRows = d.bms.map(b => `<button type="button" class="row nav" data-act="editBM" data-id="${b.id}"><span class="bristol-badge b${b.bristol || 0}">${b.bristol || "?"}</span>
-    <span class="row-main"><span class="row-label">${b.bristol ? `Type ${b.bristol} · ${BRISTOL[b.bristol]}` : "Type not set"}</span><span class="row-sub">${esc([b.time && fmtTime(b.time), b.size && BM_SIZE[b.size] && BM_SIZE[b.size][0].toLowerCase(), b.urgency && "urgent", b.incomplete && "incomplete", b.straining && "straining", b.mucus && "mucus", b.floating && "floating", b.blood && "blood"].filter(Boolean).join(" · "))}</span></span>${icon("chevR", "chev")}</button>`).join("");
+    <span class="row-main"><span class="row-label">${b.bristol ? `Type ${b.bristol} · ${BRISTOL[b.bristol]}` : "Type not set"}</span><span class="row-sub">${esc([b.time && fmtTime(b.time), b.size && BM_SIZE[b.size] && BM_SIZE[b.size][0].toLowerCase(), ...bmFlagText(b)].filter(Boolean).join(" · "))}</span></span>${icon("chevR", "chev")}</button>`).join("");
   h += group("Bowel movements", (d.bms.length ? "" : switchRow("No BM today", "nobm", "nobm", d.noBM)) + bmRows + actionRow("Add bowel movement", "addBM"), "", "", 60, "sec-bm");
 
   // breath
@@ -483,7 +483,7 @@ function renderSheet() {
       <h3 class="sheet-h3">Size</h3>
       <div class="bristol-grid size-grid" role="radiogroup" aria-label="Size">${Object.entries(BM_SIZE).map(([v, [n, l]]) => `<label class="bt"><input type="radio" name="size" value="${v}" ${b.size === v ? "checked" : ""}><span class="bt-n">${n[0]}</span><span class="bt-l"><b>${n}</b><br>${l}</span></label>`).join("")}</div>
       <p class="bristol-key">A cup is about the size of your fist</p>
-      <div class="list">${[["urgency", "Urgent"], ["incomplete", "Incomplete"], ["straining", "Straining"], ["mucus", "Mucus"], ["floating", "Floating or oily"], ["blood", "Blood"]].map(([f, n]) => `<label class="row" for="sh-${f}"><span class="row-label">${n}</span><input type="checkbox" role="switch" class="switch" id="sh-${f}" name="${f}" ${b[f] ? "checked" : ""}></label>`).join("")}</div>`;
+      <div class="list">${BM_FLAGS.map(([f, n]) => `<label class="row" for="sh-${f}"><span class="row-label">${n}</span><input type="checkbox" role="switch" class="switch" id="sh-${f}" name="${f}" ${b[f] ? "checked" : ""}></label>`).join("")}</div>`;
     if (s.bm) del = `<button type="button" class="btn destructive block" data-act="delBM" data-id="${s.bm.id}">Delete bowel movement</button>`;
   } else if (s.k === "breath") {
     const r = s.r || { time: new Date().toTimeString().slice(0, 5), ctx: "fasting" };
@@ -691,7 +691,7 @@ function submitSheet(fd) {
   if (s.k === "bm") {
     const day = touchDay(date), b = s.bm || { id: newId() };
     Object.assign(b, { time: fd.get("time") || "", bristol: fd.get("bristol") ? Number(fd.get("bristol")) : null, size: BM_SIZE[fd.get("size")] ? fd.get("size") : "" });
-    ["urgency", "incomplete", "straining", "mucus", "floating", "blood"].forEach(k => { b[k] = fd.get(k) === "on"; });
+    BM_FLAGS.forEach(([k]) => { b[k] = fd.get(k) === "on"; });
     const i = day.bms.findIndex(x => x.id === b.id);
     if (i >= 0) day.bms[i] = b; else day.bms.push(b);
     day.bms.sort((x, y) => (x.time || "").localeCompare(y.time || ""));

@@ -134,7 +134,7 @@ window.KB = (function () {
     grazing: "You log 5 or more eating occasions on a typical day",
     late_eating: "You often eat late in the evening",
     overnight_gap_short: "Your overnight gap without food is often under 12 hours",
-    constipation: "Your BM log shows hard stools (Bristol 1-2) or days with no BM",
+    constipation: "Your BM log shows hard stools (Bristol 1-2), days with no BM, or BMs that needed an enema",
     diarrhea: "Your BM log shows frequent loose stools (Bristol 6-7)",
     incomplete: "You often mark BMs as incomplete or straining",
     ch4_high: "Your FoodMarble methane readings are often elevated",
