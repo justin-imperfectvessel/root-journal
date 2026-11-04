@@ -1,7 +1,7 @@
 {
-  "name": "SIBO Root Journal",
-  "short_name": "Root Journal",
-  "description": "Daily SIBO/IMO journal with tap-to-log checkboxes, FoodMarble tracking, protocol comparisons and a root-cause finder.",
+  "name": "Case File",
+  "short_name": "Case File",
+  "description": "Build the case for your gut: a daily SIBO/IMO journal with experiments, breath tracking, protocol comparisons and a root-cause finder.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

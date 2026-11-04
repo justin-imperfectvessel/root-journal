@@ -1,4 +1,4 @@
-/* SIBO Root Journal — report for AI: everything in the journal as one plain-text (Markdown) report,
+/* Case File — report for AI: everything in the journal as one plain-text (Markdown) report,
    with instructions at the top, to paste into any AI chat and look for patterns and root causes.
    Built on this device; nothing is sent anywhere unless the person copies, shares or saves it.
    Loaded after supplements.js; shares its global scope. */
@@ -50,9 +50,9 @@ function reportDayLines(date, map) {
 function buildReport(range) {
   const map = lib(), dates = reportDates(range), T = thresholds(), unit = S.profile.settings.unit === "ppm" ? "ppm" : "FoodMarble levels (0–10)";
   const out = [], P = s => out.push(s), H = s => out.push("", `## ${s}`, "");
-  P("# SIBO / IMO journal report");
+  P("# Case File: SIBO / IMO report");
   P("");
-  P(`Made ${fmtDate(todayStr(), { year: "numeric", month: "long", day: "numeric" })} with SIBO Root Journal. ${dates.length ? `Covers ${dates.length} logged days, ${dates[0]} to ${dates[dates.length - 1]}.` : "No days logged yet."}`);
+  P(`Made ${fmtDate(todayStr(), { year: "numeric", month: "long", day: "numeric" })} with Case File. ${dates.length ? `Covers ${dates.length} logged days, ${dates[0]} to ${dates[dates.length - 1]}.` : "No days logged yet."}`);
 
   H("Instructions for the AI");
   P(`I have SIBO/IMO symptoms and keep a daily journal. Below is my health history, my test results and my journal. Please act as a careful research assistant, not a doctor. Don't diagnose or prescribe; frame what you find as things for me to discuss with my clinician.
@@ -148,18 +148,18 @@ function viewReport() {
     group("Preview", `<div class="row"><textarea id="report-text" rows="14" readonly>${esc(text)}</textarea></div>`);
 }
 async function reportSave() {
-  const data = UI.reportText || buildReport(UI.reportRange || "all"), filename = `sibo-journal-report-${todayStr()}.md`;
+  const data = UI.reportText || buildReport(UI.reportRange || "all"), filename = `case-file-report-${todayStr()}.md`;
   if (Store.downloads) { try { await Store.downloads.save({ filename, data }); return; } catch (e) { if (e && e.code === "declined") return; } }
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type: "text/markdown" })); a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 async function reportShare() {
-  const text = UI.reportText || buildReport(UI.reportRange || "all"), filename = `sibo-journal-report-${todayStr()}.md`;
+  const text = UI.reportText || buildReport(UI.reportRange || "all"), filename = `case-file-report-${todayStr()}.md`;
   try {
     // a file keeps long reports intact in apps that cut off shared text
     const file = new File([text], filename, { type: "text/markdown" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: "SIBO journal report" });
-    else await navigator.share({ title: "SIBO journal report", text });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: "Case File report" });
+    else await navigator.share({ title: "Case File report", text });
   } catch (e) { if (e && e.name !== "AbortError") toast("Couldn't share. Try Copy report instead."); }
 }
 

@@ -1,4 +1,4 @@
-/* SIBO Root Journal — nutrition: USDA food search, portions, meals, daily totals, targets, and nutrition insights.
+/* Case File — nutrition: USDA food search, portions, meals, daily totals, targets, and nutrition insights.
    Food data is USDA FoodData Central (FNDDS survey foods, public domain), bundled as foods.json and searched on this device.
    A food in the library carries its nutrients per 100 g, its household portions and your usual portion, so a
    tick on Today logs that portion. Loaded after insights.js; shares its global scope. */

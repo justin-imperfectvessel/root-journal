@@ -1,4 +1,4 @@
-/* SIBO Root Journal — knowledge base.
+/* Case File — knowledge base.
    INTAKE: health-history questions the driver engine reads (key -> yes/no/unsure).
    LABS: numeric results, turned into 0..1 signals by `flag`.
    DRIVERS: underlying causes. Each signal is {k, w}: k is "i.<intake>", "l.<lab>" or "f.<journal feature>".

@@ -1,4 +1,4 @@
-/* SIBO Root Journal — meals: each meal is one entry with a type, a time and its foods.
+/* Case File — meals: each meal is one entry with a type, a time and its foods.
    d.meals = [{ id, type, time }]; a food entry in d.items carries mid (its meal's id) and meal (the type).
    Meal times stand in for first and last bite and the meal count, and give the gaps between meals.
    Loaded after nutrition.js; shares its global scope. */

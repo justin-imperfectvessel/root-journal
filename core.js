@@ -1,4 +1,4 @@
-/* SIBO Root Journal — core: helpers, state, storage, streaks, insight engine, sample data.
+/* Case File — core: helpers, state, storage, streaks, insight engine, sample data.
    Top-level declarations are shared with ui.js (classic scripts share one global scope). */
 const { INTAKE_GROUPS, INTAKE, LABS, FEATURES, DRIVERS, PROTOCOLS, GROUPS } = window.KB;
 const LABMAP = Object.fromEntries(LABS.map(l => [l.k, l]));
@@ -92,15 +92,15 @@ function calStamp(date, time) { return date.replace(/-/g, "") + "T" + time.repla
 function googleCalUrl(time) {
   const start = calStamp(todayStr(), time);
   const [h, m] = time.split(":").map(Number), endT = `${pad((h + (m + 10 >= 60 ? 1 : 0)) % 24)}:${pad((m + 10) % 60)}`;
-  const q = new URLSearchParams({ action: "TEMPLATE", text: "Log today in SIBO Root Journal", details: "Takes a minute: tick today's items, rate symptoms, add BMs.\n" + JOURNAL_URL, dates: `${start}/${calStamp(todayStr(), endT)}`, recur: "RRULE:FREQ=DAILY" });
+  const q = new URLSearchParams({ action: "TEMPLATE", text: "Log today in Case File", details: "Takes a minute: tick today's items, rate symptoms, add BMs.\n" + JOURNAL_URL, dates: `${start}/${calStamp(todayStr(), endT)}`, recur: "RRULE:FREQ=DAILY" });
   return "https://calendar.google.com/calendar/render?" + q.toString();
 }
 function icsText(time) {
   const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
-  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SIBO Root Journal//EN", "BEGIN:VEVENT", `UID:sibo-journal-reminder-${newId()}`, `DTSTAMP:${now}`,
-    `DTSTART:${calStamp(todayStr(), time)}`, "DURATION:PT10M", "RRULE:FREQ=DAILY", "SUMMARY:Log today in SIBO Root Journal",
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Case File//EN", "BEGIN:VEVENT", `UID:sibo-journal-reminder-${newId()}`, `DTSTAMP:${now}`,
+    `DTSTART:${calStamp(todayStr(), time)}`, "DURATION:PT10M", "RRULE:FREQ=DAILY", "SUMMARY:Log today in Case File",
     `DESCRIPTION:Takes a minute: tick today's items\\, rate symptoms\\, add BMs.\\n${JOURNAL_URL}`, `URL:${JOURNAL_URL}`,
-    "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:PT0M", "DESCRIPTION:Log today in SIBO Root Journal", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n") + "\r\n";
+    "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:PT0M", "DESCRIPTION:Log today in Case File", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n") + "\r\n";
 }
 
 // ---------- storage ----------

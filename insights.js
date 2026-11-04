@@ -1,4 +1,4 @@
-/* SIBO Root Journal — insight engine.
+/* Case File — insight engine.
    Cross-references the research (KB), health history, labs, protocols and day-to-day logs into findings,
    each with its evidence, a confidence level, questions for a clinician, and a self-test that closes the loop.
    Loaded after ui.js; shares its global scope. */

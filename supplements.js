@@ -1,4 +1,4 @@
-/* SIBO Root Journal — supplements and medications: a catalog of what's common for SIBO, IMO and H2S,
+/* Case File — supplements and medications: a catalog of what's common for SIBO, IMO and H2S,
    each with its form and typical doses, and the sheet that picks one and its dose.
    A day entry is { id, dose, time, x } where dose is the amount ("20 drops") and x the times taken that day.
    Library items keep the last dose and times as the default, and sk links them to the catalog.

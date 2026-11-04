@@ -1,4 +1,4 @@
-/* SIBO Root Journal — test results.
+/* Case File — test results.
    Files go into the encrypted on-device vault (vault.js). Only the values the person
    confirms are saved to the journal (S.profile.results, and the newest value per lab
    into S.profile.labs, which the root-cause engine reads). Builds on core.js and ui.js. */
@@ -301,7 +301,7 @@ document.addEventListener("click", async e => {
     case "vaultExport": {
       const data = await Vault.exportAll();
       if (!data) break;
-      const filename = `sibo-journal-files-${todayStr()}.json`;
+      const filename = `case-file-files-${todayStr()}.json`;
       if (Store.downloads) { try { await Store.downloads.save({ filename, data }); } catch (err) { if (!err || err.code !== "declined") toast("Couldn't save the backup here"); } }
       else if (!IN_VIEWER) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type: "application/json" })); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
       else toast("Saving files isn't available here");

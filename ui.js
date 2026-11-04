@@ -1,4 +1,4 @@
-/* SIBO Root Journal — UI: app shell, navigation stack, screens, bottom sheets, events.
+/* Case File — UI: app shell, navigation stack, screens, bottom sheets, events.
    Builds on core.js (state S, UI, Store, analysis engine). */
 
 // ---------- primitives ----------
@@ -396,7 +396,7 @@ function viewMore() {
     group("Data", navRow({ label: "Report for AI", sub: "Everything you've logged, to paste into any AI", act: "push", attrs: `data-k="report"` }) + navRow({ label: "Data & backup", sub: Store.mode === "cloud" ? "Saved to your private account" : Store.mode === "demo" ? "Viewing sample data" : "Saved on this device", act: "push", attrs: `data-k="data"` }) +
       (Store.mode === "demo" ? `<button type="button" class="row action" data-act="exitDemo"><span class="row-label">Exit sample data</span></button>` : `<button type="button" class="row action" data-act="demo"><span class="row-label">Explore with sample data</span></button>`)) +
     group("Help", (PWA_HOST && !IN_VIEWER ? navRow({ label: "Check for updates", sub: window.APP_BUILD ? `Version ${window.APP_BUILD.slice(5)}` : "", act: "appUpdate" }) : "") + navRow({ label: "Layout check", sub: "Measures this screen if the page slides sideways", value: window.APP_BUILD ? window.APP_BUILD.slice(5) : "", act: "push", attrs: `data-k="layout"` })) +
-    `<p class="footnote">SIBO Root Journal is a self-tracking tool. Rankings combine your answers, labs and journal patterns with published research to organize what you bring to your clinician. It isn't medical advice. If you have blood in your stool, unintended weight loss, vomiting, fever or severe pain, see a doctor promptly.</p>`;
+    `<p class="footnote">Case File is a self-tracking tool. Rankings combine your answers, labs and journal patterns with published research to organize what you bring to your clinician. It isn't medical advice. If you have blood in your stool, unintended weight loss, vomiting, fever or severe pain, see a doctor promptly.</p>`;
 }
 
 function viewHistory() {
@@ -776,7 +776,7 @@ function paintAI() {
 }
 async function doExport() {
   const data = JSON.stringify({ app: "sibo-root-journal", version: 1, exported: new Date().toISOString(), ...S }, null, 1);
-  const filename = `sibo-journal-${todayStr()}.json`;
+  const filename = `case-file-${todayStr()}.json`;
   if (Store.downloads) {
     try { await Store.downloads.save({ filename, data }); UI.exportText = ""; render(); return; } catch (e) { if (e && e.code === "declined") return; }
   } else if (!IN_VIEWER) {
@@ -797,13 +797,13 @@ function doImport(file) {
       S = { profile: Object.assign(blankProfile(), j.profile), days: j.days };
       await Store.saveAll();
       render(); toast(`Imported ${Object.keys(S.days).length} days`);
-    } catch (e) { toast("That file isn't a SIBO Root Journal backup."); }
+    } catch (e) { toast("That file isn't a Case File backup."); }
   };
   r.readAsText(file);
 }
 async function downloadIcs() {
   const time = (reminder() || { time: ($("#rem-time") || {}).value || "20:00" }).time;
-  try { await Store.downloads.save({ filename: "sibo-journal-reminder.ics", data: icsText(time) }); toast("Open the file to add the reminder to your calendar"); }
+  try { await Store.downloads.save({ filename: "case-file-reminder.ics", data: icsText(time) }); toast("Open the file to add the reminder to your calendar"); }
   catch (e) { if (!e || e.code !== "declined") toast("Couldn't save the file here. Use Google Calendar instead."); }
 }
 

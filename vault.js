@@ -1,4 +1,4 @@
-/* SIBO Root Journal — encrypted on-device vault for test result files.
+/* Case File — encrypted on-device vault for test result files.
 
    What it protects: the uploaded file and its name/type are encrypted before they
    are written, and only ever stored in this browser's IndexedDB. Nothing in here

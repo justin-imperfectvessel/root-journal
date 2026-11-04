@@ -1,4 +1,4 @@
-/* SIBO Root Journal — "Tell me about your day" and the "Still missing" card.
+/* Case File — "Tell me about your day" and the "Still missing" card.
    Speech becomes text through the phone's own keyboard dictation; parser.js turns the
    text into proposals on this device; the person reviews them; only confirmed entries
    are saved. The transcript lives in memory while the sheet is open and is never stored. */

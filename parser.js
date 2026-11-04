@@ -1,4 +1,4 @@
-/* SIBO Root Journal — turns a spoken or typed day into journal proposals, entirely on this device.
+/* Case File — turns a spoken or typed day into journal proposals, entirely on this device.
 
    parseDay(text, ctx) -> { proposals, unparsed }
      ctx = { library: [{id, name, cat, dose}], symptoms: [{k, name}] }
