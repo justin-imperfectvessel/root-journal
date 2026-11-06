@@ -80,6 +80,8 @@ function protocolCheck(p) {
 
   if (st === "planned") {
     if (s.base.n < 7) add("warn", "Log daily before it starts", `Only ${s.base.n} of the 14 days before the start have a score. With fewer than about 7, the before-and-after comparison will be weak.`);
+  } else if (s.during.n === 0) {
+    // entered from memory, or from before logging started: only judge what doesn't need daily data
   } else {
     if (s.base.mean == null) add("warn", "No baseline to compare against", "There are too few logged days in the 2 weeks before it started, so the app can't say whether it's working. Symptom and breath changes below are still worth reading.");
     if (!p.itemIds.length) add("info", "No checklist items", "Add the supplements or practices to this protocol so the app can track how consistently you follow it.");
@@ -150,7 +152,10 @@ function protocolCheck(p) {
   // ---- verdict and course options
   let verdict;
   const topRoot = roots[0];
-  if (st === "planned") verdict = { tone: "", title: "Not started yet", text: "The check fills in once it's running. Log daily before it starts so there's a clear baseline." };
+  if (st !== "planned" && s.during.n === 0) {
+    verdict = { tone: "", title: "No logged days during it", text: "It ran before you logged here, or those days weren't logged, so the app can't judge how it went. Your own notes on it matter most." };
+    if (p.notes) facts.push(["Notes", p.notes]);
+  } else if (st === "planned") verdict = { tone: "", title: "Not started yet", text: "The check fills in once it's running. Log daily before it starts so there's a clear baseline." };
   else if (s.relapse) {
     verdict = { tone: "warn", title: "It worked, then it came back", text: "The protocol helped, but symptoms returned after it ended. The overgrowth was probably cleared and then regrew, so the question is why." };
     next.push({ t: "Fix why it came back", d: `A prokinetic and meal spacing to protect the cleaning wave${topRoot ? `, and a look at your top-ranked cause: ${topRoot.d.name.toLowerCase()}` : ""}.` });

@@ -55,11 +55,11 @@ function buildReport(range) {
   P(`Made ${fmtDate(todayStr(), { year: "numeric", month: "long", day: "numeric" })} with Case File. ${dates.length ? `Covers ${dates.length} logged days, ${dates[0]} to ${dates[dates.length - 1]}.` : "No days logged yet."}`);
 
   H("Instructions for the AI");
-  P(`I have SIBO/IMO symptoms and keep a daily journal. Below is my health history, my test results and my journal. Please act as a careful research assistant, not a doctor. Don't diagnose or prescribe; frame what you find as things for me to discuss with my clinician.
+  P(`I have SIBO/IMO symptoms and keep a daily journal. The report runs: where things stand now, my health history, labs and tests, a timeline of the protocols I've tried (each with the app's check), what the app's analysis found, then my week-by-week and day-by-day log, oldest to newest. Please act as a careful research assistant, not a doctor. Don't diagnose or prescribe; frame what you find as things for me to discuss with my clinician.
 
 1. Look for patterns across the daily log: foods, meals and meal timing, supplements and medications, sleep, stress, the menstrual cycle and bowel movements, against symptoms and day scores. Allow for delays of 1–3 days, and for things that change together.
 2. Rank the most likely underlying drivers (root causes) of my SIBO/IMO. For each, cite the specific evidence from my history, labs and log, and say what would make it more or less likely.
-3. Say how each protocol I tried seems to have gone, and why it might have worked or not. The app's own protocol checks are under "What the app's own analysis found": agree or disagree with them, and say what you'd change or ask my practitioner.
+3. Say how each protocol I tried seems to have gone, and why it might have worked or not. Each protocol in the timeline has the app's own check under it: agree or disagree, and say what you'd change or ask my practitioner. Weigh the current situation ("Where things stand now" and the most recent days) most heavily when suggesting next steps.
 4. List what's missing or contradictory: data that would change the picture.
 5. Suggest specific tests and questions for my clinician, and 1–2 journal experiments (what to change, for how long, what to track).
 
@@ -68,6 +68,23 @@ Use both Western (conventional) medicine and alternative and integrative approac
 Be specific to my numbers. If a pattern rests on only a few days, say so.
 
 How to read the data: symptoms, the overall gut day and stress are 0–10, where 0 is none or best. The day score is the overall gut day when given, or else the average of the 3 worst symptoms. Bristol stool type runs 1–7: 1–2 hard, 3–4 ideal, 5–7 loose. BM size is by volume (a cup is about a fist). Breath readings are ${unit}; the app treats H2 ≥ ${T.h2} and CH4 ≥ ${T.ch4} as elevated. Times are 24-hour.`);
+
+  // where things stand now: the current picture first, so it isn't buried at the end of a long log
+  const A = analyze(), sum = aiSummary();
+  const checkOf = new Map(S.profile.protocols.filter(p => p.start).map(p => [p.id, protocolCheck(p)]));
+  H("Where things stand now");
+  const t0 = todayStr(), last14 = rangeMean(addDays(t0, -13), t0), prev14 = rangeMean(addDays(t0, -27), addDays(t0, -14));
+  if (last14.n) P(`- **Last 14 days:** average day score ${r1(last14.mean)} (${last14.n} days logged)${prev14.n ? `, compared with ${r1(prev14.mean)} in the 14 days before (${prev14.n} days)` : ""}. 0 is best.`);
+  else P("- **Last 14 days:** nothing logged.");
+  const symNow = S.profile.symptoms.map(sy => { const v = []; for (let i = 0; i < 14; i++) { const d = S.days[addDays(t0, -i)]; const x = d && d.symptoms && d.symptoms[sy.k]; if (typeof x === "number") v.push(x); } return { name: sy.name, m: v.length >= 3 ? mean(v) : null }; })
+    .filter(x => x.m != null && x.m >= 2).sort((a, b) => b.m - a.m).slice(0, 4);
+  if (symNow.length) P(`- **Main symptoms lately:** ${symNow.map(x => `${x.name.toLowerCase()} ${r1(x.m)}`).join(", ")} (14-day averages, 0-10)`);
+  const hardNow = constipationRate(addDays(t0, -13), t0);
+  if (hardNow != null) P(`- **Bowel movements lately:** hard stools or no BM on ${Math.round(hardNow * 100)}% of logged days`);
+  const current = S.profile.protocols.filter(p => p.start && ["active", "planned"].includes(protoStatus(p))).sort((a, b) => a.start.localeCompare(b.start));
+  if (current.length) current.forEach(p => { const c = checkOf.get(p.id); P(`- **${protoStatus(p) === "planned" ? "Planned" : "Current"} protocol:** ${p.name}, ${protoStatus(p) === "planned" ? `starts ${p.start}` : `day ${c.days} (started ${p.start})`}. App's check: ${c.verdict.title}.`); });
+  else P("- **Current protocols:** none running.");
+  if (sum.topDrivers.length) P(`- **Top-ranked root causes:** ${sum.topDrivers.slice(0, 3).map(r => `${r.name} (${r.match.toLowerCase()})`).join("; ")}`);
 
   // health history
   const ans = INTAKE.filter(q => S.profile.intake[q.k]);
@@ -95,35 +112,35 @@ How to read the data: symptoms, the overall gut day and stress are 0–10, where
   }
   if (!labs.length && !res.length) P("None entered.");
 
-  // protocols
-  const A = analyze();
-  H("Protocols and treatments tried");
-  if (!A.protoStats.length) P("None entered.");
-  for (const { p, s } of A.protoStats) {
-    P(`- **${p.name}** (${(PROTO_KINDS.find(k => k[0] === p.kind) || ["", "Other"])[1]}), ${p.start || "no start"} to ${p.end || "ongoing"}. Items: ${p.itemIds.map(id => map[id] && `${map[id].name}${doseLabel(map[id]) ? ` ${doseLabel(map[id])}` : ""}`).filter(Boolean).join(", ") || "none"}.`);
-    P(`  Average day score before ${r1(s.base.mean)} (${s.base.n} d), during ${r1(s.during.mean)} (${s.during.n} d), last 7 days ${r1(s.late.mean)}${s.after.n ? `, after ${r1(s.after.mean)} (${s.after.n} d)` : ""}. Adherence ${s.adherence == null ? "unknown" : Math.round(s.adherence * 100) + "%"}. App's verdict: ${s.verdict}.${p.notes ? ` Notes: ${p.notes}` : ""}`);
+  // protocols as a timeline, oldest first, each followed by the app's check
+  H("Protocol timeline");
+  const timeline = [...A.protoStats].sort((a, b) => (a.p.start || "9999").localeCompare(b.p.start || "9999"));
+  if (!timeline.length) P("None entered.");
+  else P("Oldest first. Day scores are averages (0 best): before = the 2 weeks before it started, last 7 days = the final week on it, after = up to 60 days after it ended.");
+  for (const { p, s } of timeline) {
+    const st = p.start ? protoStatus(p) : "draft", c = checkOf.get(p.id);
+    P("");
+    P(`### ${p.start || "No start date"} to ${p.end || (st === "planned" ? "?" : "ongoing")}: ${p.name}`);
+    P(`- Type: ${(PROTO_KINDS.find(k => k[0] === p.kind) || ["", "Other"])[1]}. Status: ${st}. Items: ${p.itemIds.map(id => map[id] && `${map[id].name}${doseLabel(map[id]) ? ` ${doseLabel(map[id])}` : ""}`).filter(Boolean).join(", ") || "none"}.`);
+    if (p.start && st !== "planned" && !s.during.n) P("- No logged days during it (before logging here, or entered from memory).");
+    else if (p.start && st !== "planned") P(`- Day score before ${r1(s.base.mean)} (${s.base.n} d), during ${r1(s.during.mean)} (${s.during.n} d), last 7 days ${r1(s.late.mean)}${s.after.n ? `, after ${r1(s.after.mean)} (${s.after.n} d)` : ""}. Adherence ${s.adherence == null ? "unknown" : Math.round(s.adherence * 100) + "%"}.`);
+    if (p.notes) P(`- My notes: ${p.notes}`);
+    if (!c) continue;
+    P(`- **App's check: ${c.verdict.title}.** ${c.verdict.text}`);
+    c.facts.filter(([k]) => k === "Better" || k === "Worse" || k === "Breath").forEach(([k, v]) => P(`  - ${k}: ${v}`));
+    c.findings.forEach(f => P(`  - Found: ${f.title}. ${f.text}`));
+    c.next.forEach(n => P(`  - Way forward: ${n.t}. ${n.d}`));
+    c.qs.forEach(q => P(`  - Question for my practitioner: ${q}`));
+    const who = c.ex.map(id => (EXPERTS.find(e => e.id === id) || {}).name).filter(Boolean);
+    if (who.length) P(`  - Draws on the work of: ${who.join(", ")}`);
   }
 
   // what the app already found
-  const sum = aiSummary();
   H("What the app's own analysis found");
   P("These come from simple rules and correlations in the app. Treat them as leads to check against the raw log, not conclusions.");
   P("");
   if (sum.topDrivers.length) { P("**Root causes ranked by how well they fit**"); sum.topDrivers.forEach(r => P(`- ${r.name} (${r.match.toLowerCase()}). Evidence: ${r.evidence.join("; ") || "none listed"}`)); P(""); }
   if (sum.insights.length) { P("**Insights**"); sum.insights.forEach(x => P(`- ${x.finding}${x.confidence ? ` (${x.confidence} confidence)` : ""}${x.evidence.length ? `: ${x.evidence.join("; ")}` : ""}${x.test ? ` Test result: ${x.test}` : ""}`)); P(""); }
-  const checks = S.profile.protocols.filter(p => p.start).sort((a, b) => b.start.localeCompare(a.start)).map(protocolCheck);
-  if (checks.length) {
-    P("**Protocol checks** (the app's rule-based review of each protocol, drawing on its expert library)");
-    for (const c of checks) {
-      const who = c.ex.map(id => (EXPERTS.find(e => e.id === id) || {}).name).filter(Boolean);
-      P(`- ${c.p.name} (${c.st}): ${c.verdict.title}. ${c.verdict.text}`);
-      c.findings.forEach(f => P(`  - Found: ${f.title}. ${f.text}`));
-      c.next.forEach(n => P(`  - Way forward: ${n.t}. ${n.d}`));
-      c.qs.forEach(q => P(`  - Question for my practitioner: ${q}`));
-      if (who.length) P(`  - Draws on the work of: ${who.join(", ")}`);
-    }
-    P("");
-  }
   if (sum.beforeWorseDays.length) P(`**Logged before worse days** (change in day score): ${sum.beforeWorseDays.join(", ")}`);
   if (sum.beforeBetterDays.length) P(`**Logged before better days**: ${sum.beforeBetterDays.join(", ")}`);
   if (sum.breath) P(`**Breath pattern**: ${kv(Object.fromEntries(Object.entries(sum.breath).filter(([, v]) => typeof v !== "object")))}`);
