@@ -77,6 +77,7 @@ function pageTitle(p) {
   if (p.k === "tx") return PROTOCOLS[p.i] ? PROTOCOLS[p.i].name : "";
   if (p.k === "expert") { const e = EXPERTS.find(x => x.id === p.id); return e ? e.name : ""; }
   if (p.k === "insight") return "Insight";
+  if (p.k === "protocheck") return "Protocol check";
   if (p.k === "nutrition") return "Nutrition";
   return { history: "History & labs", research: "Research library", data: "Data & backup", reminder: "Daily reminder", nosignal: "No signal yet", color: "Color", results: "Test results", layout: "Layout check", report: "Report for AI" }[p.k] || "";
 }
@@ -103,7 +104,7 @@ function render() {
   const v = $("#view");
   if (UI.loading) { v.innerHTML = `<div class="loading"><span class="spinner"></span></div>`; return; }
   let html;
-  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, expert: viewExpert, nosignal: viewNoSignal, insight: viewInsight, nutrition: viewNutrition, report: viewReport })[p.k](p);
+  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, expert: viewExpert, protocheck: viewProtoCheck, nosignal: viewNoSignal, insight: viewInsight, nutrition: viewNutrition, report: viewReport })[p.k](p);
   else html = ({ today: viewToday, trends: viewTrends, protocols: viewProtocols, insights: viewInsights, more: viewMore })[UI.tab]();
   v.innerHTML = (Store.mode === "demo" && !p ? `<div class="demo-pill"><span>Sample data · nothing is saved</span><button type="button" class="textbtn" data-act="exitDemo">Exit</button></div>` : "") + html;
   if (UI.tab === "insights" && !p && UI.aiText) paintAI();
@@ -357,6 +358,7 @@ function viewProtocols() {
       </div>
       ${p.experiment ? (() => { const r = experimentResult(p); return `<div class="row verdict ${r.verdict === "helped" ? "good" : r.verdict === "worse" ? "bad" : ""}"><span class="row-label">Test: ${esc(r.text)}</span></div>` + navRow({ label: "See the insight it's testing", sub: esc(p.experiment.title || ""), act: "push", attrs: `data-k="insight" data-id="${esc(p.experiment.insight)}"` }); })()
         : `<div class="row verdict ${tone}"><span class="row-label">${esc(s.verdict)}</span></div>`}
+      ${p.start ? navRow({ label: "Check this protocol", sub: "Is it working, what's missing, questions to ask", act: "push", attrs: `data-k="protocheck" data-id="${p.id}"` }) : ""}
       ${p.notes ? `<div class="row"><span class="row-sub">${esc(p.notes)}</span></div>` : ""}
     </div></section>`;
   }
@@ -640,6 +642,7 @@ document.addEventListener("click", e => {
     case "demo": Store.sampleBackup = { S, mode: Store.mode }; S = sampleState(); Store.mode = "demo"; UI.date = todayStr(); UI.tab = "today"; UI.stack = []; render(); window.scrollTo(0, 0); break;
     case "exitDemo": S = Store.sampleBackup.S; Store.mode = Store.sampleBackup.mode; Store.sampleBackup = null; UI.aiText = ""; UI.stack = []; render(); break;
     case "export": doExport(); break;
+    case "copyCheck": { const txt = protoCheckText(t.dataset.id); navigator.clipboard.writeText(txt).then(() => toast("Copied. Paste it into a message or your notes."), () => toast("Couldn't copy on this device")); break; }
     case "copyExport": { const ta = $("#exporttext"); navigator.clipboard.writeText(UI.exportText).then(() => toast("Copied"), () => { ta.select(); toast("Press Ctrl or Cmd + C to copy"); }); break; }
     case "hideItem": { const it = S.profile.library.find(i => i.id === t.dataset.id); it.hidden = true; Store.saveProfile(); render(); break; }
     case "unhideItem": { const it = S.profile.library.find(i => i.id === t.dataset.id); it.hidden = false; Store.saveProfile(); render(); break; }

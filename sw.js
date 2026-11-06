@@ -1,7 +1,7 @@
 /* Case File service worker: caches the app shell so it opens offline.
    build-pwa.py fills in VERSION and FILES; a new version replaces the old cache. */
-const VERSION = "cbd30a4957fb";
-const FILES = ["./", "index.html", "knowledge.js", "core.js", "vault.js", "parser.js", "ui.js", "insights.js", "nutrition.js", "meals.js", "supplements.js", "report.js", "results.js", "voice.js", "foods.json", "stt-worker.js", "manifest.webmanifest", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png"];
+const VERSION = "188e782333b2";
+const FILES = ["./", "index.html", "knowledge.js", "core.js", "vault.js", "parser.js", "ui.js", "insights.js", "protocheck.js", "nutrition.js", "meals.js", "supplements.js", "report.js", "results.js", "voice.js", "foods.json", "stt-worker.js", "manifest.webmanifest", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png"];
 const CACHE = "root-journal-" + VERSION;
 
 self.addEventListener("install", e => {

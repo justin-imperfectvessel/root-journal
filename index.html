@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-11-06 13:52";</script>
+<script>window.APP_BUILD = "2026-11-06 14:00";</script>
 <title>Case File</title>
 <meta name="description" content="Build the case for your gut: a daily SIBO/IMO journal with experiments, breath tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -313,6 +313,7 @@ svg .bsdot.b1, svg .bsdot.b2 { fill: var(--ink); } svg .bsdot.b3, svg .bsdot.b4 
 .cmp-v { font-family: var(--display); font-size: 30px; line-height: 1; padding-top: 2px; font-variant-numeric: tabular-nums; }
 .cmp-n { font-size: 12px; color: var(--ink-3); }
 .verdict .row-label { font-weight: 700; }
+.check-row.good .row-label { color: var(--good); } .check-row.bad .row-label { color: var(--bad); } .check-row.warn .row-label { color: var(--warn); }
 .verdict.good .row-label { color: var(--good); } .verdict.bad .row-label { color: var(--bad); } .verdict.warn .row-label { color: var(--warn); }
 
 /* insights */
@@ -540,6 +541,7 @@ input.filled { background: var(--pop) !important; border-radius: 6px; padding: 2
 <script src="parser.js"></script>
 <script src="ui.js"></script>
 <script src="insights.js"></script>
+<script src="protocheck.js"></script>
 <script src="nutrition.js"></script>
 <script src="meals.js"></script>
 <script src="supplements.js"></script>
