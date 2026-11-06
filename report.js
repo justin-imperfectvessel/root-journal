@@ -59,7 +59,7 @@ function buildReport(range) {
 
 1. Look for patterns across the daily log: foods, meals and meal timing, supplements and medications, sleep, stress, the menstrual cycle and bowel movements, against symptoms and day scores. Allow for delays of 1–3 days, and for things that change together.
 2. Rank the most likely underlying drivers (root causes) of my SIBO/IMO. For each, cite the specific evidence from my history, labs and log, and say what would make it more or less likely.
-3. Say how each protocol I tried seems to have gone, and why it might have worked or not.
+3. Say how each protocol I tried seems to have gone, and why it might have worked or not. The app's own protocol checks are under "What the app's own analysis found": agree or disagree with them, and say what you'd change or ask my practitioner.
 4. List what's missing or contradictory: data that would change the picture.
 5. Suggest specific tests and questions for my clinician, and 1–2 journal experiments (what to change, for how long, what to track).
 
@@ -111,6 +111,19 @@ How to read the data: symptoms, the overall gut day and stress are 0–10, where
   P("");
   if (sum.topDrivers.length) { P("**Root causes ranked by how well they fit**"); sum.topDrivers.forEach(r => P(`- ${r.name} (${r.match.toLowerCase()}). Evidence: ${r.evidence.join("; ") || "none listed"}`)); P(""); }
   if (sum.insights.length) { P("**Insights**"); sum.insights.forEach(x => P(`- ${x.finding}${x.confidence ? ` (${x.confidence} confidence)` : ""}${x.evidence.length ? `: ${x.evidence.join("; ")}` : ""}${x.test ? ` Test result: ${x.test}` : ""}`)); P(""); }
+  const checks = S.profile.protocols.filter(p => p.start).sort((a, b) => b.start.localeCompare(a.start)).map(protocolCheck);
+  if (checks.length) {
+    P("**Protocol checks** (the app's rule-based review of each protocol, drawing on its expert library)");
+    for (const c of checks) {
+      const who = c.ex.map(id => (EXPERTS.find(e => e.id === id) || {}).name).filter(Boolean);
+      P(`- ${c.p.name} (${c.st}): ${c.verdict.title}. ${c.verdict.text}`);
+      c.findings.forEach(f => P(`  - Found: ${f.title}. ${f.text}`));
+      c.next.forEach(n => P(`  - Way forward: ${n.t}. ${n.d}`));
+      c.qs.forEach(q => P(`  - Question for my practitioner: ${q}`));
+      if (who.length) P(`  - Draws on the work of: ${who.join(", ")}`);
+    }
+    P("");
+  }
   if (sum.beforeWorseDays.length) P(`**Logged before worse days** (change in day score): ${sum.beforeWorseDays.join(", ")}`);
   if (sum.beforeBetterDays.length) P(`**Logged before better days**: ${sum.beforeBetterDays.join(", ")}`);
   if (sum.breath) P(`**Breath pattern**: ${kv(Object.fromEntries(Object.entries(sum.breath).filter(([, v]) => typeof v !== "object")))}`);
