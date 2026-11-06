@@ -574,6 +574,271 @@ window.KB = (function () {
       fails: "H2 blockers also lower stomach acid, a SIBO risk factor; weigh with clinician." },
   ];
 
+  // Prominent voices in SIBO/IMO care. `roles` is the kind of work they do; `lens` is the approach they bring;
+  // `basis` is what their recommendations mainly rest on. `protocols` are PROTOCOLS names, `drivers` are DRIVERS ids.
+  // Summaries are in our own words from their published work and talks (researched November 2026).
+  const LENSES = [
+    ["Conventional", "Academic gastroenterology: drug trials, diagnostic tests and guidelines"],
+    ["Integrative MD", "Medical doctors who add diet, herbs and lifestyle to standard care"],
+    ["Naturopathic", "Naturopathic doctors: herbs, diet, physical exam and prescription options where licensed"],
+    ["Functional", "Functional-medicine clinicians focused on step-by-step, low-cost protocols"],
+    ["Diet researcher", "Scientists who work on diet design rather than seeing patients"],
+  ];
+  const EXPERTS = [
+    { id: "pimentel", name: "Dr. Mark Pimentel", creds: "MD, FRCP(C)", where: "Cedars-Sinai (MAST program), Los Angeles",
+      roles: ["Researcher", "Clinician"], lens: "Conventional", basis: "Peer-reviewed trials and lab research",
+      approach: "Treats IBS and SIBO largely as a motility problem, often started by food poisoning. Diagnose with a breath test, treat with targeted drugs or an elemental diet, then prevent relapse.",
+      known: [
+        "The post-infectious IBS model: food-poisoning toxin (CdtB) triggers antibodies against vinculin, which damage the gut's cleaning wave (MMC). Basis of the ibs-smart blood test.",
+        "Rifaximin trials (TARGET) that led to its approval for IBS with diarrhea.",
+        "Separating methane from SIBO and naming it IMO (intestinal methanogen overgrowth): driven by archaea such as M. smithii, linked to constipation.",
+        "Co-author of the 2017 North American breath-testing consensus and the 2020 ACG SIBO guideline.",
+        "Trio-smart breath test, adding hydrogen sulfide to hydrogen and methane.",
+        "A more palatable elemental diet (2025): in 30 adults, 73% normalized their breath test after 2 weeks. Small study with no control group.",
+        "Co-author, with Dr. Rezaie, of The Microbiome Connection (book).",
+      ],
+      takeaways: [
+        "Breath test cutoffs: hydrogen rise of 20 ppm or more by 90 minutes = SIBO; methane 10 ppm or more at any point = IMO.",
+        "Match treatment to gas: rifaximin for hydrogen, rifaximin plus neomycin (or other methane-targeted options) for methane.",
+        "After clearing, use a prokinetic and space meals to protect the MMC, because relapse is common.",
+        "Positive anti-vinculin or anti-CdtB suggests post-infectious nerve damage and a need for long-term prevention.",
+      ],
+      caveat: "Has financial ties to companies selling some of these tools, including Gemelli Biotech (ibs-smart, Trio-smart) and Good LFE (an elemental diet), as disclosed by Cedars-Sinai.",
+      protocols: ["Rifaximin (Xifaxan)", "Rifaximin + neomycin", "Elemental diet", "Prucalopride", "Low-dose erythromycin", "Meal spacing (MMC support)"],
+      drivers: ["post_infectious", "mmc_grazing", "methanogens", "h2s", "treatment_mismatch"],
+      links: [["2025 elemental diet study (Cedars-Sinai)", "https://www.cedars-sinai.org/newsroom/new-cedars-sinai-study-shows-how-specialized-diet-can-improve-gut-disorders/"],
+        ["North American breath-testing consensus (PubMed)", "https://pubmed.ncbi.nlm.nih.gov/28323273/"]] },
+
+    { id: "rezaie", name: "Dr. Ali Rezaie", creds: "MD, MSc", where: "Cedars-Sinai, Los Angeles (GI motility)",
+      roles: ["Researcher", "Clinician"], lens: "Conventional", basis: "Peer-reviewed trials and diagnostic research",
+      approach: "Works with Dr. Pimentel's group on how to test for overgrowth and on non-drug treatments, especially breath-test standards, hydrogen sulfide and elemental diets.",
+      known: [
+        "First author of the 2017 North American Consensus on hydrogen and methane breath testing.",
+        "Hydrogen sulfide research and the Trio-smart test (hydrogen sulfide 3 ppm or more counts as positive).",
+        "Led the 2025 palatable elemental diet trial: methane, methanogens and hydrogen all fell; 73% normalized.",
+        "Co-author of The Microbiome Connection with Dr. Pimentel.",
+      ],
+      takeaways: [
+        "A flat hydrogen line with diarrhea and rotten-egg gas may point to hydrogen sulfide, which older tests can't see.",
+        "Elemental diet is an option when antibiotics fail or aren't wanted, and it works across hydrogen, methane and hydrogen sulfide.",
+        "Test with a standardized protocol so results can be compared before and after treatment.",
+      ],
+      caveat: "Shares Dr. Pimentel's disclosed financial ties to Gemelli Biotech and Good LFE.",
+      protocols: ["Elemental diet", "Rifaximin (Xifaxan)", "Low-sulfur diet + bismuth"],
+      drivers: ["h2s", "methanogens", "treatment_mismatch"],
+      links: [["North American breath-testing consensus (PubMed)", "https://pubmed.ncbi.nlm.nih.gov/28323273/"],
+        ["2025 elemental diet study (Cedars-Sinai)", "https://www.cedars-sinai.org/newsroom/new-cedars-sinai-study-shows-how-specialized-diet-can-improve-gut-disorders/"]] },
+
+    { id: "rao", name: "Dr. Satish S.C. Rao", creds: "MD, PhD, FRCP", where: "Augusta University (Medical College of Georgia)",
+      roles: ["Researcher", "Clinician"], lens: "Conventional", basis: "Peer-reviewed studies on testing and motility",
+      approach: "Motility specialist. Looks at how transit, the pelvic floor and test methods shape what gets called SIBO, and tests objectively before treating.",
+      known: [
+        "Breath-test methodology, including the limits of glucose testing (glucose is absorbed early, so it mostly finds overgrowth high in the small bowel). Co-author of the North American Consensus and the 2020 ACG guideline.",
+        "Uses small-bowel aspirate culture alongside breath testing in research.",
+        "Large body of work on dyssynergic defecation (pelvic floor that doesn't coordinate) and biofeedback therapy.",
+        "2018 study linking brain fog, probiotic use, SIBO and D-lactic acidosis. Small and observational, and its methods have been publicly debated.",
+      ],
+      takeaways: [
+        "If constipation doesn't respond, ask about anorectal testing; pelvic floor problems often hide behind methane results.",
+        "A negative glucose breath test doesn't fully rule out overgrowth further down the small bowel.",
+        "If you have brain fog and bloat while taking probiotics, consider a supervised pause and discuss D-lactic acid.",
+      ],
+      caveat: "",
+      protocols: ["Pelvic floor PT / biofeedback", "Rifaximin (Xifaxan)", "Probiotics (S. boulardii, select strains)"],
+      drivers: ["pelvic_floor", "gastroparesis", "methanogens"],
+      links: [["Brain fog, probiotics and SIBO (2018, PMC)", "https://pmc.ncbi.nlm.nih.gov/articles/PMC6006167"],
+        ["North American breath-testing consensus (PubMed)", "https://pubmed.ncbi.nlm.nih.gov/28323273/"]] },
+
+    { id: "weinstock", name: "Dr. Leonard Weinstock", creds: "MD, FACG", where: "Specialists in Gastroenterology, St. Louis",
+      roles: ["Clinician", "Researcher"], lens: "Integrative MD", basis: "Pilot studies, case series and clinical experience",
+      approach: "Gastroenterologist who follows SIBO's effects outside the gut and combines standard drugs with immune-modulating tools such as low-dose naltrexone.",
+      known: [
+        "SIBO and rosacea: rosacea improved in most patients after rifaximin in his 2013 case series (study funded by rifaximin's maker).",
+        "SIBO and restless legs syndrome, along with low iron and inflammation.",
+        "Mast cell activation and its overlap with SIBO, interstitial cystitis and pelvic pain.",
+        "Low-dose naltrexone (LDN) as part of multi-step treatment, often after rifaximin. Starts low (about 1 mg) and builds up over a couple of weeks, judging the effect over about 2 months.",
+      ],
+      takeaways: [
+        "Skin flushing, restless legs or bladder pain alongside gut symptoms are worth raising with your doctor as possibly SIBO-related.",
+        "Check ferritin if you have restless legs.",
+        "LDN may be considered for relapse prevention or immune overlap; it is off-label and the evidence is early.",
+      ],
+      caveat: "Most of the LDN evidence comes from small studies and conference talks rather than controlled trials.",
+      protocols: ["Rifaximin (Xifaxan)", "Low-dose naltrexone (LDN)", "Mast cell support"],
+      drivers: ["mcas", "nutrients"],
+      links: [["Restless legs and LDN talk (LDN Research Trust)", "https://ldnresearchtrust.org/restless-leg-syndrome-leonard-weinstock-md-2021-conference-ldn-low-dose-naltrexone"]] },
+
+    { id: "mullin", name: "Dr. Gerard Mullin", creds: "MD", where: "Johns Hopkins, Baltimore",
+      roles: ["Researcher", "Clinician", "Author"], lens: "Integrative MD", basis: "Clinical studies and nutrition research",
+      approach: "Integrative gastroenterologist who puts nutrition and herbal options alongside standard care.",
+      known: [
+        "2014 Johns Hopkins study of herbs versus rifaximin: 46% cleared on herbs versus 34% on rifaximin, a difference that wasn't statistically significant. 57% of people who failed rifaximin cleared with herbs afterwards.",
+        "This chart review, not a randomized trial, is still the most-cited support for herbal SIBO treatment.",
+        "Books on gut health and the microbiome, including The Inside Tract and The Gut Balance Revolution.",
+      ],
+      takeaways: [
+        "Herbal antimicrobials are a reasonable alternative to rifaximin, or a next step after it fails.",
+        "Nutrition is treated as part of the treatment, not an afterthought.",
+      ],
+      caveat: "The herbs-versus-rifaximin study looked back at charts and didn't randomize patients; the authors called for prospective trials.",
+      protocols: ["Herbal antimicrobials", "Rifaximin (Xifaxan)", "Probiotics (S. boulardii, select strains)"],
+      drivers: ["antibiotics_hx", "nutrients"],
+      links: [["Herbal therapy vs rifaximin (2014, PMC)", "https://pmc.ncbi.nlm.nih.gov/articles/PMC4030608/"]] },
+
+    { id: "chutkan", name: "Dr. Robynne Chutkan", creds: "MD, FASGE", where: "Digestive Center for Wellness, Chevy Chase, MD (Georgetown faculty)",
+      roles: ["Clinician", "Author"], lens: "Integrative MD", basis: "Clinical experience and microbiome research",
+      approach: "Gastroenterologist focused on rebuilding the microbiome with diet and lifestyle, and cautious about overusing antibiotics. Treats SIBO as one of many causes of bloating.",
+      known: [
+        "Books: Gutbliss (a 10-day bloating plan), The Microbiome Solution and The Bloat Cure (101 causes of bloating).",
+        "The Gutbliss podcast.",
+        "Emphasizes plant fiber, fewer antibiotics and less sanitizing to restore microbial diversity.",
+        "Points to alcohol as a SIBO risk factor.",
+      ],
+      takeaways: [
+        "If treatment isn't helping, check the other causes of bloating as well as SIBO.",
+        "Plan to bring back a diverse, high-fiber diet after treatment instead of staying restricted.",
+        "Avoid unnecessary antibiotics where you can.",
+      ],
+      caveat: "Her public material is general gut-health guidance more than a SIBO-specific protocol.",
+      protocols: ["PHGG (partially hydrolyzed guar gum)", "Low FODMAP / SIBO-specific diet"],
+      drivers: ["antibiotics_hx", "alcohol", "restrictive_diet"],
+      links: [["Gutbliss (book)", "https://www.penguinrandomhouse.com/books/313148/gutbliss-by-robynne-chutkan"]] },
+
+    { id: "ruscio", name: "Dr. Michael Ruscio", creds: "DC", where: "Ruscio Institute for Functional Health",
+      roles: ["Clinician", "Educator", "Author"], lens: "Functional", basis: "His reading of published studies, plus clinical experience",
+      approach: "Step-by-step and low-cost: start with diet and probiotics, then add antimicrobials, and save the elemental diet for stubborn cases. Judges progress by symptoms, not repeat tests alone.",
+      known: [
+        "Book: Healthy Gut, Healthy You.",
+        "Three steps: low FODMAP for 1-3 months; probiotics for at least 2 months; then antimicrobials (about 2 weeks of antibiotics or about 2 months of herbs).",
+        "Uses one probiotic from each of three types: lactobacillus-bifidobacterium blend, S. boulardii, and soil-based (spore) strains.",
+        "Elemental diet as an escalation step.",
+        "Podcast and articles reviewing new studies for patients.",
+      ],
+      takeaways: [
+        "Try the cheapest, gentlest step first and judge each one by how you feel.",
+        "Probiotics are used as a treatment, not just for maintenance.",
+        "Don't stay on a restrictive diet longer than needed; reintroduce foods.",
+      ],
+      caveat: "A chiropractor, not a medical doctor, who sells his own supplement line. His protocols draw on published studies but haven't been tested as a whole.",
+      protocols: ["Low FODMAP / SIBO-specific diet", "Probiotics (S. boulardii, select strains)", "Herbal antimicrobials", "Elemental diet"],
+      drivers: ["restrictive_diet"],
+      links: [["The 3-step SIBO treatment guide", "https://drruscio.com/?p=71141"]] },
+
+    { id: "jacobi", name: "Dr. Nirala Jacobi", creds: "BHSc, ND", where: "The SIBO Doctor (practitioner training and clinic)",
+      roles: ["Educator", "Clinician"], lens: "Naturopathic", basis: "Clinical experience and practitioner teaching",
+      approach: "Naturopath who trains practitioners in reading breath tests and sequencing treatment, with phased diets and herbal antimicrobials, including for hard methane cases.",
+      known: [
+        "SIBO Bi-Phasic Diet: a roughly 3-month phased diet (restricted, then semi-restricted) built on Dr. Siebecker's SIBO Specific Food Guide, since revised to allow more foods.",
+        "Practitioner training programs and The SIBO Doctor podcast.",
+        "Methane rules of thumb: methane typically falls about 20-30 ppm per 4-6 week herbal course, so high methane can take several rounds.",
+        "Raises whether methane really reflects small-bowel or large-bowel overgrowth.",
+      ],
+      takeaways: [
+        "Always test both hydrogen and methane, since methanogens turn hydrogen into methane and can hide it.",
+        "With very high methane, plan for more than one round and retest between rounds.",
+        "Pair the diet with a treatment phase rather than using diet alone.",
+      ],
+      caveat: "The Bi-Phasic Diet hasn't been tested in published trials.",
+      protocols: ["Herbal antimicrobials", "Allicin (stabilized garlic extract)", "Low FODMAP / SIBO-specific diet"],
+      drivers: ["methanogens", "treatment_mismatch"],
+      links: [["The SIBO Bi-Phasic Diet", "https://thesibodoctor.com/the-original-sibo-bi-phasic-diet"]] },
+
+    { id: "siebecker", name: "Dr. Allison Siebecker", creds: "ND, MSOM, LAc", where: "Portland, Oregon (siboinfo.com)",
+      roles: ["Educator", "Clinician"], lens: "Naturopathic", basis: "Clinical experience combined with published research",
+      approach: "Uses both prescription and herbal treatment, matched to gas type, in successive rounds until breath tests normalize, followed by a strong prevention phase.",
+      known: [
+        "Co-founded the SIBO Center for Digestive Health at NUNM. Runs siboinfo.com, a long-running free resource, and trains practitioners.",
+        "Treatment algorithm modeled on the Cedars-Sinai approach: confirm with a 3-hour lactulose breath test, treat with antibiotics, herbs or elemental diet, retest, and repeat rounds as needed.",
+        "SIBO Specific Food Guide, which blends the SCD and low FODMAP diets.",
+        "Prokinetics for at least 3 months after treatment, such as prucalopride, low-dose erythromycin or LDN (which she says acts like a prokinetic without technically being one).",
+        "Detailed guidance on methane and hydrogen sulfide subtypes.",
+      ],
+      takeaways: [
+        "Retest after each round; one round often isn't enough.",
+        "Start a prokinetic right after treatment ends and keep it going for months.",
+        "Use diet to manage symptoms during treatment, then loosen it.",
+      ],
+      caveat: "",
+      protocols: ["Rifaximin (Xifaxan)", "Rifaximin + neomycin", "Herbal antimicrobials", "Allicin (stabilized garlic extract)", "Elemental diet", "Low FODMAP / SIBO-specific diet", "Prucalopride", "Low-dose erythromycin", "Low-dose naltrexone (LDN)", "Meal spacing (MMC support)"],
+      drivers: ["mmc_grazing", "methanogens", "h2s", "treatment_mismatch"],
+      links: [["siboinfo.com", "https://www.siboinfo.com/"],
+        ["Is LDN a good prokinetic? (siboinfo)", "https://www.siboinfo.com/blog/qa-is-ldn-a-good-prokinetic-for-sibo-does-ldn-help-the-mmc"]] },
+
+    { id: "sandberg_lewis", name: "Dr. Steven Sandberg-Lewis", creds: "ND, DHANP", where: "NUNM, Portland, Oregon",
+      roles: ["Educator", "Clinician", "Author"], lens: "Naturopathic", basis: "Decades of clinical experience; hands-on exam techniques",
+      approach: "Naturopathic gastroenterology that looks for structural and mechanical causes: the ileocecal valve, hiatal hernia, adhesions and low stomach acid. Uses manual techniques alongside other treatment.",
+      known: [
+        "Has taught at NUNM since 1985; wrote the textbook Functional Gastroenterology; co-founded the SIBO Center at NUNM.",
+        "The ileocecal valve: a valve that stays open lets colon bacteria back up into the small bowel. Cites a 2014 study linking low valve pressure to SIBO.",
+        "Separates true hiatal hernia from 'hiatal hernia syndrome' and corrects it by hand for reflux and upper-belly pain.",
+        "Teaches a functional GI physical exam, including valve and organ-mobility checks.",
+        "Hidden causes of stubborn SIBO: low stomach acid, PPIs, adhesions, oral infections, and hypermobility (EDS).",
+      ],
+      takeaways: [
+        "After surgery, or with pain in one spot, ask about adhesions and manual therapy.",
+        "Low stomach acid and long-term PPI use are causes worth correcting.",
+        "If SIBO keeps relapsing, look for a mechanical cause.",
+      ],
+      caveat: "The manual valve and hernia techniques rest mostly on clinical experience rather than controlled trials.",
+      protocols: ["Visceral manipulation", "Digestive support (HCl, enzymes, bile)"],
+      drivers: ["icv", "adhesions", "hypochlorhydria", "ppi", "eds"],
+      links: [["Functional GI practicum (The SIBO Doctor)", "https://thesibodoctor.com/functional-gastrointestinal-practicum"]] },
+
+    { id: "morstein", name: "Dr. Mona Morstein", creds: "ND (NMD)", where: "Arizona Integrative Medical Solutions, Tempe, Arizona",
+      roles: ["Clinician", "Educator", "Author"], lens: "Naturopathic", basis: "Clinical experience and teaching",
+      approach: "Manages the whole case for complex patients, with attention to diabetes, bile and gallbladder health, and hormones alongside SIBO.",
+      known: [
+        "Taught gastroenterology at Southwest College of Naturopathic Medicine; more than 25 years focused on digestive and hormonal conditions.",
+        "Talks and podcasts on SIBO with diabetes (nerve damage slowing motility) and on bile and gallbladder health.",
+        "Author of Master Your Diabetes.",
+        "Widely cited for using low-dose naltrexone. Not confirmed: the sources found don't describe her LDN protocol.",
+      ],
+      takeaways: [
+        "If you have blood-sugar problems, glucose control is part of SIBO treatment.",
+        "Check bile flow, especially after gallbladder removal or with fatty stools.",
+      ],
+      caveat: "Her specific SIBO and LDN protocol isn't published in the sources found; her clinic site is the best source.",
+      protocols: ["Low-dose naltrexone (LDN)", "Digestive support (HCl, enzymes, bile)"],
+      drivers: ["diabetes", "bile"],
+      links: [["SIBO and diabetes interview (The SIBO Doctor)", "https://www.thesibodoctor.com/2017/11/09/sibo-diabetes-mona-morstein/"]] },
+
+    { id: "nambudripad", name: "Dr. Rajsree Nambudripad", creds: "MD", where: "OC Integrative Medicine, Orange County, California",
+      roles: ["Clinician", "Educator"], lens: "Integrative MD", basis: "Clinical experience; podcasts and patient education",
+      approach: "Internal medicine doctor using phased herbal protocols that fix motility first, before antimicrobials, to cut down on relapse.",
+      known: [
+        "A 'gut garden' framework of four parts: motility, digestive enzymes, gut-lining integrity and the microbiome.",
+        "Phase one: bedtime magnesium citrate and a ginger/artichoke prokinetic, so the cleaning wave runs overnight. Then enzymes, probiotics and herbal antimicrobials in sequence.",
+        "Treats IMO as a major root cause of chronic constipation.",
+        "Teaches meal spacing for the MMC.",
+      ],
+      takeaways: [
+        "Get bowels moving regularly before or alongside killing bacteria; constipation alone often drives bloating.",
+        "Space meals so the overnight cleaning wave can run.",
+      ],
+      caveat: "Her protocol is shared through her practice and podcasts and hasn't been tested in published trials.",
+      protocols: ["Ginger + artichoke", "Meal spacing (MMC support)", "Herbal antimicrobials", "Digestive support (HCl, enzymes, bile)", "Probiotics (S. boulardii, select strains)"],
+      drivers: ["methanogens", "mmc_grazing"],
+      links: [["Gut protocol interview (episode summary)", "https://www.shortform.com/podcast/episode/the-mel-robbins-podcast-2026-08-31-episode-summary-heal-your-gut-a-doctors-4-part-protocol-to-stop-bloating-boost-energy-feel-better-now"]] },
+
+    { id: "robillard", name: "Dr. Norm Robillard", creds: "PhD (microbiology)", where: "Digestive Health Institute",
+      roles: ["Researcher", "Author"], lens: "Diet researcher", basis: "Diet theory and a small pilot; little independent data",
+      approach: "Microbiologist who manages SIBO, IBS and reflux without drugs by cutting down on carbohydrates that are likely to ferment.",
+      known: [
+        "Fast Tract Diet, which scores foods by 'fermentation potential' (FP) from glycemic index, fiber, sugars and sugar alcohols. Unlike other SIBO diets, it separates low-FP starches (such as jasmine rice) from high-FP ones.",
+        "Books: Heartburn Cured and the Fast Tract Digestion series. FP calculator and app.",
+        "Links reflux to gas pressure from fermentation in the gut.",
+        "Presented the diet at Digestive Disease Week in 2013.",
+      ],
+      takeaways: [
+        "If you can't tolerate low FODMAP, a fermentation-score diet is an alternative way to choose starches.",
+        "Reflux and SIBO may share a fermentation cause.",
+      ],
+      caveat: "Not a clinician. The FP system hasn't been independently tested in clinical trials.",
+      protocols: ["Low FODMAP / SIBO-specific diet"],
+      drivers: ["ppi", "restrictive_diet"],
+      links: [["What is the Fast Tract Diet?", "https://digestivehealthinstitute.org/fast-tract-diet/"]] },
+  ];
+
   // Food/item keyword groups used for trigger detection and medication flags.
   const GROUPS = {
     histamine: /aged|parmesan|cheddar|wine|beer|kombucha|sauerkraut|kimchi|kefir|fermented|vinegar|bone broth|leftover|salami|cured|smoked|spinach|tomato|avocado|eggplant|chocolate|cocoa|soy sauce|tuna|sardine|mackerel/i,
@@ -587,5 +852,5 @@ window.KB = (function () {
     antimicrobial: /rifaximin|xifaxan|neomycin|metronidazole|flagyl|berberine|oregano|neem|allicin|allimed|candibactin|dysbiocide|fc-cidal|atrantil|biocidin|monolaurin|nystatin|fluconazole/i,
   };
 
-  return { INTAKE_GROUPS, INTAKE, LABS, FEATURES, DRIVERS, PROTOCOLS, GROUPS };
+  return { INTAKE_GROUPS, INTAKE, LABS, FEATURES, DRIVERS, PROTOCOLS, LENSES, EXPERTS, GROUPS };
 })();

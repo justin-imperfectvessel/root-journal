@@ -75,6 +75,7 @@ function pageTitle(p) {
   if (!p) return (TABS.find(t => t[0] === UI.tab) || [])[1] || "";
   if (p.k === "driver") { const d = DRIVERS.find(x => x.id === p.id); return d ? d.name : ""; }
   if (p.k === "tx") return PROTOCOLS[p.i] ? PROTOCOLS[p.i].name : "";
+  if (p.k === "expert") { const e = EXPERTS.find(x => x.id === p.id); return e ? e.name : ""; }
   if (p.k === "insight") return "Insight";
   if (p.k === "nutrition") return "Nutrition";
   return { history: "History & labs", research: "Research library", data: "Data & backup", reminder: "Daily reminder", nosignal: "No signal yet", color: "Color", results: "Test results", layout: "Layout check", report: "Report for AI" }[p.k] || "";
@@ -102,7 +103,7 @@ function render() {
   const v = $("#view");
   if (UI.loading) { v.innerHTML = `<div class="loading"><span class="spinner"></span></div>`; return; }
   let html;
-  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, nosignal: viewNoSignal, insight: viewInsight, nutrition: viewNutrition, report: viewReport })[p.k](p);
+  if (p) html = ({ history: viewHistory, research: viewResearch, data: viewData, reminder: viewReminder, color: viewColor, results: viewResults, layout: viewLayout, driver: viewDriver, tx: viewTx, expert: viewExpert, nosignal: viewNoSignal, insight: viewInsight, nutrition: viewNutrition, report: viewReport })[p.k](p);
   else html = ({ today: viewToday, trends: viewTrends, protocols: viewProtocols, insights: viewInsights, more: viewMore })[UI.tab]();
   v.innerHTML = (Store.mode === "demo" && !p ? `<div class="demo-pill"><span>Sample data · nothing is saved</span><button type="button" class="textbtn" data-act="exitDemo">Exit</button></div>` : "") + html;
   if (UI.tab === "insights" && !p && UI.aiText) paintAI();
@@ -379,6 +380,7 @@ function viewDriver(p) {
   h += group("Why treatment may not stick", `<div class="row prose">${esc(d.stuck)}</div>`);
   h += group("Ask your clinician about", list(d.tests));
   h += group("Approaches people use", list(d.approach), "Summaries of published research and clinical consensus. Work with a clinician before starting or stopping anything.");
+  h += expertsFor(EXPERTS.filter(e => e.drivers.includes(d.id)));
   return h;
 }
 
@@ -392,7 +394,7 @@ function viewMore() {
       navRow({ label: "Daily reminder", value: r ? fmtTime(r.time) : "Off", act: "push", attrs: `data-k="reminder"` }) +
       `<div class="row field-row"><span class="row-label">FoodMarble units</span>${seg("Units", [["level", "Levels"], ["ppm", "ppm"]], S.profile.settings.unit, "unit")}</div>` +
       (S.profile.settings.colorEarned ? navRow({ label: "Color", value: S.profile.settings.color === "mono" ? "Black and white" : `${colorSteps()} of ${COLOR_STEPS}`, act: "push", attrs: `data-k="color"` }) : "")) +
-    group("Learn", navRow({ label: "Research library", sub: `${DRIVERS.length} root causes · ${PROTOCOLS.length} protocols`, act: "push", attrs: `data-k="research"` })) +
+    group("Learn", navRow({ label: "Research library", sub: `${DRIVERS.length} root causes · ${PROTOCOLS.length} protocols · ${EXPERTS.length} experts`, act: "push", attrs: `data-k="research"` })) +
     group("Data", navRow({ label: "Report for AI", sub: "Everything you've logged, to paste into any AI", act: "push", attrs: `data-k="report"` }) + navRow({ label: "Data & backup", sub: Store.mode === "cloud" ? "Saved to your private account" : Store.mode === "demo" ? "Viewing sample data" : "Saved on this device", act: "push", attrs: `data-k="data"` }) +
       (Store.mode === "demo" ? `<button type="button" class="row action" data-act="exitDemo"><span class="row-label">Exit sample data</span></button>` : `<button type="button" class="row action" data-act="demo"><span class="row-label">Explore with sample data</span></button>`)) +
     group("Help", (PWA_HOST && !IN_VIEWER ? navRow({ label: "Check for updates", sub: window.APP_BUILD ? `Version ${window.APP_BUILD.slice(5)}` : "", act: "appUpdate" }) : "") + navRow({ label: "Layout check", sub: "Measures this screen if the page slides sideways", value: window.APP_BUILD ? window.APP_BUILD.slice(5) : "", act: "push", attrs: `data-k="layout"` })) +
@@ -416,17 +418,43 @@ function viewResearch() {
   const cats = ["all", ...new Set(DRIVERS.map(d => d.cat))];
   const ds = DRIVERS.filter(d => (UI.libCat === "all" || d.cat === UI.libCat) && (!q || (d.name + d.mech + d.stuck + d.cat).toLowerCase().includes(q)));
   const ps = PROTOCOLS.map((p, i) => ({ p, i })).filter(({ p }) => !q || (p.name + p.what + p.type + p.works + p.fails).toLowerCase().includes(q));
-  return `<div class="searchbar">${icon("search")}<input type="search" id="libq" data-act="libq" placeholder="Search causes and protocols" value="${esc(UI.libQuery)}" aria-label="Search"></div>
+  const es = EXPERTS.filter(e => !q || [e.name, e.creds, e.where, e.lens, e.roles.join(" "), e.approach, e.known.join(" "), e.takeaways.join(" ")].join(" ").toLowerCase().includes(q));
+  return `<div class="searchbar">${icon("search")}<input type="search" id="libq" data-act="libq" placeholder="Search causes, protocols and experts" value="${esc(UI.libQuery)}" aria-label="Search"></div>
     <div class="scroller"><div class="filter">${cats.map(c => `<button type="button" class="fchip" data-act="libCat" data-c="${esc(c)}" aria-pressed="${UI.libCat === c}">${c === "all" ? "All" : esc(c)}</button>`).join("")}</div></div>` +
     group(`Root causes <span class="gh-meta">${ds.length}</span>`, ds.map(d => navRow({ label: esc(d.name), sub: `${esc(d.cat)} · <span class="ev-t ${d.ev}">${d.ev}</span> ${gasTags(d.gas)}`, act: "push", attrs: `data-k="driver" data-id="${d.id}"` })).join("") || `<div class="row"><span class="row-sub">No causes match.</span></div>`) +
     group(`Protocols <span class="gh-meta">${ps.length}</span>`, ps.map(({ p, i }) => navRow({ label: esc(p.name), sub: `${esc(p.type)} · <span class="ev-t ${p.ev}">${p.ev}</span> ${gasTags(p.gas)}`, act: "push", attrs: `data-k="tx" data-i="${i}"` })).join("") || `<div class="row"><span class="row-sub">No protocols match.</span></div>`,
-      "Evidence: strong = consistent clinical studies; moderate = supportive studies; emerging = early research or clinical observation.");
+      "Evidence: strong = consistent clinical studies; moderate = supportive studies; emerging = early research or clinical observation.") +
+    group(`Experts <span class="gh-meta">${es.length}</span>`, es.map(expertRow).join("") || `<div class="row"><span class="row-sub">No experts match.</span></div>`,
+      LENSES.map(([l, t]) => `<strong>${esc(l)}</strong>: ${esc(t)}.`).join(" "));
+}
+const expertRow = e => navRow({ label: `${esc(e.name)}, ${esc(e.creds)}`, sub: `<span class="ev-t lens">${esc(e.lens)}</span> · ${esc(e.roles.join(", "))}`, act: "push", attrs: `data-k="expert" data-id="${e.id}"` });
+const expertsFor = es => es.length ? group("Experts who work on this", es.map(expertRow).join("")) : "";
+function viewExpert(p) {
+  const e = EXPERTS.find(x => x.id === p.id);
+  const list = a => a.map(t => `<div class="row"><span class="row-label">${esc(t)}</span></div>`).join("");
+  const lensText = (LENSES.find(l => l[0] === e.lens) || [])[1] || "";
+  let h = `<div class="detail-head" id="large-title"><h1>${esc(e.name)}</h1><div class="tagline"><span class="tag">${esc(e.lens)}</span>${e.roles.map(r => `<span class="tag">${esc(r)}</span>`).join("")}</div></div>`;
+  h += group("Who", `<div class="row"><span class="row-main"><span class="row-label">${esc(e.creds)}</span><span class="row-sub">${esc(e.where)}</span></span></div>
+    <div class="row"><span class="row-main"><span class="row-label">Approach: ${esc(e.lens)}</span><span class="row-sub">${esc(lensText)}</span></span></div>
+    <div class="row"><span class="row-main"><span class="row-label">Evidence behind it</span><span class="row-sub">${esc(e.basis)}</span></span></div>`);
+  h += group("How they approach SIBO/IMO", `<div class="row prose">${esc(e.approach)}</div>`);
+  h += group("Known for", list(e.known));
+  h += group("Takeaways to bring to your clinician", list(e.takeaways));
+  if (e.caveat) h += group("Keep in mind", `<div class="row prose">${esc(e.caveat)}</div>`);
+  const ps = e.protocols.map(n => PROTOCOLS.findIndex(x => x.name === n)).filter(i => i >= 0);
+  if (ps.length) h += group("Protocols they use or studied", ps.map(i => navRow({ label: esc(PROTOCOLS[i].name), sub: esc(PROTOCOLS[i].type), act: "push", attrs: `data-k="tx" data-i="${i}"` })).join(""));
+  const ds = e.drivers.map(id => DRIVERS.find(d => d.id === id)).filter(Boolean);
+  if (ds.length) h += group("Root causes they focus on", ds.map(d => navRow({ label: esc(d.name), sub: esc(d.cat), act: "push", attrs: `data-k="driver" data-id="${d.id}"` })).join(""));
+  h += group("Sources", e.links.map(([t, u]) => `<a class="row nav" href="${esc(u)}" target="_blank" rel="noopener"><span class="row-main"><span class="row-label">${esc(t)}</span></span>${icon("chevR", "chev")}</a>`).join(""),
+    "Summarized in our own words from their published work and talks. This describes their views, not advice for you.");
+  return h;
 }
 function viewTx(p) {
   const t = PROTOCOLS[p.i];
   return `<div class="detail-head" id="large-title"><h1>${esc(t.name)}</h1><div class="tagline"><span class="tag">${esc(t.type)}</span><span class="ev ${t.ev}">${t.ev} evidence</span>${gasTags(t.gas)}</div></div>` +
     group("What it is", `<div class="row prose">${esc(t.what)}</div>`) + group("Best for", `<div class="row prose">${esc(t.works)}</div>`) +
-    group("Where it falls short", `<div class="row prose">${esc(t.fails)}</div>`, "Doses are as studied, not recommendations. Work with a clinician before starting or stopping anything.");
+    group("Where it falls short", `<div class="row prose">${esc(t.fails)}</div>`, "Doses are as studied, not recommendations. Work with a clinician before starting or stopping anything.") +
+    expertsFor(EXPERTS.filter(e => e.protocols.includes(t.name)));
 }
 
 function viewData() {
