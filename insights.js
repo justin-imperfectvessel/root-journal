@@ -169,6 +169,8 @@ const EXPERIMENTS = {
     notes: "Five minutes, twice a day: hum, gargle hard, or breathe in for 4 and out for 6. Before meals works well." },
   walk_after_meals: { name: "Walks after meals", kind: "lifestyle", days: 14, items: ["10-minute walk after meals"],
     notes: "A gentle 10-minute walk after each main meal." },
+  probiotic_pause: { name: "Probiotic pause", kind: "other", days: 14, items: ["No probiotics"],
+    notes: "Leave out probiotic capsules and powders for 14 days, keeping everything else steady. If a clinician prescribed one, ask before pausing it. Then bring it back for 2 or 3 days and watch your brain fog." },
   no_alcohol: { name: "Alcohol pause", kind: "diet", days: 21, items: ["No alcohol"], notes: "No alcohol for 3 weeks, including hard seltzer and cider." },
 };
 const pauseTest = it => ({ name: `Pause ${it.name}`, kind: "other", days: 14, items: [`No ${it.name.replace(/,/g, "")}`],
@@ -202,6 +204,28 @@ function experimentResult(p) {
   }
   return { status, day, length, adherence, done, base, during, c, verdict, text };
 }
+
+// ---------- helpers for the treatment-cycle rules ----------
+const daysSince = d => Math.round((parseD(todayStr()) - parseD(d)) / 864e5);
+const moves = n => GROUPS.bowel.test(n) || GROUPS.prokinetic.test(n);
+function lastEndedAntimicrobial(X) {
+  return X.protos.filter(x => x.anti && x.p.end && protoStatus(x.p) === "ended").sort((a, b) => b.p.end.localeCompare(a.p.end))[0] || null;
+}
+function hasProkinetic(X, map, since) {
+  const pk = p => p.kind === "prokinetic" || GROUPS.prokinetic.test(p.name) || p.itemIds.some(id => map[id] && GROUPS.prokinetic.test(map[id].name));
+  if (X.protos.some(x => pk(x.p) && x.p.start && (!x.p.end || x.p.end >= since))) return true;
+  return Object.values(S.days).some(d => d.date >= since && itemNames(d, map).some(i => GROUPS.prokinetic.test(i.name)));
+}
+
+// Which experts' work each insight draws on, shown on the insight page (ids from KB.EXPERTS).
+const INSIGHT_EXPERTS = {
+  "methane-mismatch": ["pimentel", "siebecker", "jacobi"], "methane-dropping": ["jacobi"], "protocol-helped": ["pimentel", "siebecker"],
+  relapse: ["pimentel", "siebecker"], grazing: ["pimentel", "nambudripad"], "late-eating": ["nambudripad"], histamine: ["weinstock"],
+  fodmap: ["siebecker", "ruscio", "chutkan"], h2s: ["rezaie", "pimentel"], "not-the-bugs": ["sandberg_lewis", "ruscio"],
+  "methane-constipation": ["rao", "nambudripad"], ppi: ["sandberg_lewis", "robillard"], "post-infectious": ["pimentel"],
+  "antimicrobial-worse": ["weinstock"], "prevention-gap": ["siebecker", "pimentel"], retest: ["siebecker", "jacobi"],
+  "methane-rounds": ["jacobi", "siebecker"], "probiotic-fog": ["rao"], "bowels-first": ["nambudripad"], "glucose-negative": ["rao"],
+};
 
 // ---------- cross-reference rules ----------
 // Each rule reads the context and returns null or a finding. kind: act (try something), ask (raise with a clinician),
@@ -535,6 +559,97 @@ const RULES = [
       evidence: [strong ? ["Journal", `Alcohol (${X.st.groupFoods.alcohol.slice(0, 3).join(", ")}): ${fxText(fx)}`] : ["Journal", FEATURES.alcohol_logged]],
       why: "Alcohol slows the migrating motor complex, irritates the gut lining and is linked to SIBO in studies, even at moderate amounts.", ask: [] };
   },
+  // ---- treatment-cycle rules, drawn from the expert library (see INSIGHT_EXPERTS) ----
+  function preventionGap(X) {
+    if (X.fired.has("relapse")) return null;
+    const last = lastEndedAntimicrobial(X), map = X.A.map;
+    if (!last && !X.yes("no_prevention")) return null;
+    const ev = [];
+    if (last) {
+      const since = daysSince(last.p.end);
+      if (since > 180 || hasProkinetic(X, map, last.p.end)) return null;
+      ev.push(["Protocol", `${last.p.name} ended ${since === 0 ? "today" : since === 1 ? "yesterday" : since + " days ago"}`], ["Protocol", "No prokinetic logged since then"]);
+    }
+    if (X.yes("no_prevention")) ev.push(["History", "You said your last treatment ended without a prevention plan"]);
+    if ((X.F.grazing || 0) >= 0.5) ev.push(["Journal", FEATURES.grazing]);
+    if (X.yes("foodpoisoning")) ev.push(["History", "Symptoms started after food poisoning or a stomach bug"]);
+    return { id: "prevention-gap", kind: "act", conf: last ? "high" : "moderate", drivers: ["mmc_grazing", "post_infectious"], test: "meal_spacing",
+      title: "Protect the result: start relapse prevention",
+      summary: last ? `${last.p.name} has ended and no prokinetic is logged.` : "Your last treatment ended without a plan to keep it from coming back.", evidence: ev,
+      why: "Clearing an overgrowth doesn't repair the slowed cleaning wave (MMC) that let it grow, so relapse within months is common. Leading clinicians start a prokinetic as soon as antimicrobials end and keep it going for at least 3 months, alongside 4-5 hour gaps between meals and a 12-hour overnight fast.",
+      ask: ["Which prokinetic fits me (prucalopride, low-dose erythromycin, low-dose naltrexone, or ginger + artichoke), and for how long?", "Should I start it now, before symptoms come back?"] };
+  },
+  function retest(X) {
+    const last = lastEndedAntimicrobial(X);
+    if (last) {
+      const since = daysSince(last.p.end);
+      if (since < 10 || since > 60) return null;
+      const after = Object.values(S.days).filter(d => d.date > last.p.end && d.breath.length).length;
+      const ev = [["Protocol", `${last.p.name} ended ${since} days ago`]];
+      ev.push(["Breath", after ? `${after} day${after > 1 ? "s" : ""} of FoodMarble readings since then` : "No breath readings logged since it ended"]);
+      return { id: "retest", kind: "act", conf: "moderate", drivers: ["treatment_mismatch"],
+        title: "Retest to see if the round worked", summary: `${last.p.name} ended ${since} days ago, the usual window for a follow-up breath test.`, evidence: ev,
+        why: "A follow-up breath test 2-4 weeks after a round shows whether the gas you were treating has normalized. If it hasn't, the usual next step is another round or a different approach, not stopping. Symptoms alone can improve while the overgrowth is only partly cleared.",
+        ask: ["Should I book a follow-up breath test, and should it be the same type as last time?"] };
+    }
+    if (!X.yes("no_retest") || !X.yes("multiple_failed")) return null;
+    return { id: "retest", kind: "ask", conf: "low", drivers: ["treatment_mismatch"],
+      title: "Past rounds weren't confirmed with a retest", summary: "Without a retest, it's hard to tell a round that failed from one that only partly worked.",
+      evidence: [["History", "You said your last round wasn't followed by a retest"], ["History", "You said several treatments haven't worked"]],
+      why: "Successive rounds with retesting between them is the standard approach for stubborn cases. A retest also shows whether the gas type has shifted, for example from hydrogen to methane.",
+      ask: ["Before the next round, should we retest to see where things stand?"] };
+  },
+  function methaneRounds(X) {
+    const peak = num(S.profile.labs.breath_ch4);
+    if (peak == null || peak < 35) return null;
+    const rounds = Math.ceil((peak - 10) / 25);
+    const ev = [["Lab", `Lab breath test methane peak ${peak} ppm`]];
+    if (X.fired.has("methane-dropping")) ev.push(["Breath", "Your FoodMarble methane is already coming down"]);
+    return { id: "methane-rounds", kind: "watch", conf: "moderate", drivers: ["methanogens"],
+      title: "High methane usually takes more than one round",
+      summary: `From a peak of ${peak} ppm, plan on roughly ${rounds} rounds, with a retest between each.`, evidence: ev,
+      why: "Clinicians who specialize in SIBO report that methane often falls about 20-30 ppm with each 4-6 week antimicrobial course, so high starting levels clear in steps. A partial drop after one round is progress, not failure. This is clinical experience rather than trial data.",
+      ask: ["How many rounds do you expect for my methane level, and when should we retest between them?", "Is my protocol targeted at methane (for example rifaximin with neomycin, or allicin)?"] };
+  },
+  function probioticFog(X) {
+    const f = X.F.probiotic_fog || 0;
+    if (f < 0.5 && !X.yes("probiotic_fog")) return null;
+    const ev = [];
+    if (f >= 0.5) ev.push(["Journal", FEATURES.probiotic_fog]);
+    if (X.yes("probiotic_fog")) ev.push(["History", "You said probiotics make brain fog or bloating worse"]);
+    const tracksFog = S.profile.symptoms.some(s => s.k === "brainfog");
+    return { id: "probiotic-fog", kind: "ask", conf: f >= 0.5 ? "moderate" : "low", drivers: ["dlactic"], test: "probiotic_pause", measure: tracksFog ? "brainfog" : "score",
+      title: "Probiotics may be feeding your brain fog", summary: "Brain fog and bloating that track with probiotics fit a D-lactic acid pattern.", evidence: ev,
+      why: "Some probiotic strains, mostly lactobacillus, make D-lactic acid, which the body clears slowly. A small 2018 study linked brain fog to probiotic use, SIBO and D-lactic acid, and most people improved after stopping probiotics. The study was small, so a pause is a test, not a verdict.",
+      ask: ["Should I pause probiotics for a couple of weeks?", "Would a urine D-lactic acid test or a breath test help?"] };
+  },
+  function bowelsFirst(X) {
+    if ((X.F.constipation || 0) < 0.5) return null;
+    const map = X.A.map, soon = X.protos.filter(x => x.anti && ["planned", "active"].includes(protoStatus(x.p)));
+    if (!soon.length) return null;
+    const support = X.protos.some(x => ["planned", "active"].includes(protoStatus(x.p)) && (x.p.kind === "prokinetic" || moves(x.p.name) || x.p.itemIds.some(id => map[id] && moves(map[id].name))));
+    const recent = [0, 1, 2, 3, 4, 5, 6].some(i => { const d = S.days[addDays(todayStr(), -i)]; return d && itemNames(d, map).some(it => moves(it.name)); });
+    if (support || recent) return null;
+    return { id: "bowels-first", kind: "act", conf: "moderate", drivers: ["methanogens", "mmc_grazing"],
+      title: "Get things moving alongside the antimicrobial",
+      summary: `${soon[0].p.name} is ${protoStatus(soon[0].p) === "planned" ? "planned" : "running"}, but nothing in your plan targets constipation.`,
+      evidence: [["Journal", FEATURES.constipation], ["Protocol", `${soon[0].p.name}: no prokinetic or bowel support logged with it`]],
+      why: "Constipation keeps gas and bacteria in place and is often the main driver of bloating. Some integrative clinicians fix motility first, for example with bedtime magnesium citrate and a ginger + artichoke prokinetic, so the antimicrobial works in a gut that's emptying. Check with a clinician before adding magnesium if you have kidney disease.",
+      ask: ["What should I add for motility during this round (magnesium, PHGG, a prokinetic)?", "Would starting motility support a week or two before the antimicrobial help?"] };
+  },
+  function glucoseNegative(X) {
+    if (!X.yes("glucose_test")) return null;
+    const h2 = num(S.profile.labs.breath_h2), ch4 = num(S.profile.labs.breath_ch4);
+    if (h2 == null && ch4 == null) return null;
+    if ((h2 != null && h2 >= 20) || (ch4 != null && ch4 >= 10)) return null;
+    const ev = [["History", "Your breath test used glucose"], ["Lab", `Result below the positive cutoffs${h2 != null ? ` (hydrogen rise ${h2} ppm)` : ""}`]];
+    if (X.yes("diet_helped")) ev.push(["History", "An elemental or low-FODMAP diet clearly helped, which points to fermentation"]);
+    return { id: "glucose-negative", kind: "ask", conf: X.yes("diet_helped") ? "moderate" : "low", drivers: [],
+      title: "A negative glucose test doesn't rule out SIBO lower down",
+      summary: "Glucose is absorbed in the first few feet of the small bowel, so overgrowth further along can be missed.", evidence: ev,
+      why: "Glucose breath tests are specific but miss some cases, because glucose rarely reaches the lower small bowel. Lactulose travels the whole length. Motility researchers note this limit when a glucose test is negative but symptoms fit.",
+      ask: ["Would a lactulose breath test add anything for me?"] };
+  },
   function trend(X) {
     const tr = X.st.trend;
     if (!tr || !tr.conf || tr.conf === "low" || Math.abs(tr.diff) < 1) return null;
@@ -723,6 +838,8 @@ function viewInsight(p) {
   if (x.ask && x.ask.length) h += group("Ask your clinician", x.ask.map(q => `<div class="row"><span class="row-label">${esc(q)}</span></div>`).join(""));
   const ds = (x.drivers || []).map(id => DRIVERS.find(d => d.id === id)).filter(Boolean);
   if (ds.length) h += group("Related drivers", ds.map(d => navRow({ label: esc(d.name), sub: esc(d.cat), act: "push", attrs: `data-k="driver" data-id="${d.id}"` })).join(""));
+  const ex = (INSIGHT_EXPERTS[x.id] || []).map(id => EXPERTS.find(e => e.id === id)).filter(Boolean);
+  if (ex.length) h += group("Whose work this draws on", ex.map(expertRow).join(""), "Their approaches differ. Open each to see the kind of work they do and the lens they bring.");
   if (x.link === "history") h += group("", navRow({ label: "Open your health history", act: "push", attrs: `data-k="history"` }));
   h += group("", `<button type="button" class="row action" data-act="hideInsight" data-id="${esc(x.id)}"><span class="row-label">Hide this insight</span></button>`, "This points to things to test and questions for a clinician. It isn't a diagnosis.");
   return h;

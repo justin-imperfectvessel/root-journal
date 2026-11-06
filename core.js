@@ -343,6 +343,11 @@ function analyze() {
     F.ppi_logged = any(GROUPS.ppi) ? 1 : 0;
     F.opioid_logged = any(GROUPS.opioid) ? 1 : 0;
     F.alcohol_logged = clamp(days.filter(d => itemNames(d, map).some(i => i.cat === "food" && GROUPS.alcohol.test(i.name))).length / days.length / 0.4);
+    // brain fog on probiotic days vs other days (0-5 symptom scale); a 1-point gap is a clear signal
+    const fog = days.filter(d => d.symptoms && typeof d.symptoms.brainfog === "number");
+    const onP = fog.filter(d => itemNames(d, map).some(i => GROUPS.probiotic.test(i.name))).map(d => d.symptoms.brainfog);
+    const offP = fog.filter(d => !itemNames(d, map).some(i => GROUPS.probiotic.test(i.name))).map(d => d.symptoms.brainfog);
+    if (onP.length >= 4 && offP.length >= 4) F.probiotic_fog = clamp((mean(onP) - mean(offP)) / 1);
   }
   // food group triggers
   const groupLift = {};
