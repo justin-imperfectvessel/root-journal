@@ -77,6 +77,8 @@ How to read the data: symptoms, the overall gut day and stress are 0–10, where
     const qs = ans.filter(q => q.g === g.id);
     if (qs.length) { P(`**${g.name}**`); qs.forEach(q => P(`- ${q.q} ${yn[S.profile.intake[q.k]] || S.profile.intake[q.k]}`)); P(""); }
   }
+  const extra = (S.profile.historyNotes || "").trim();
+  if (extra) { P("**Anything else, in their own words**"); P(extra); P(""); }
 
   // labs and tests
   H("Labs and test results");

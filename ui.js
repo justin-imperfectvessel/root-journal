@@ -410,6 +410,8 @@ function viewHistory() {
   }
   h += group("Lab results", LABS.map(l => `<label class="row lab-row" for="lab-${l.k}"><span class="row-main"><span class="row-label">${esc(l.name)}</span><span class="row-sub">${esc(l.hint)}</span></span>
     <span class="field-end"><input id="lab-${l.k}" type="number" step="any" inputmode="decimal" data-act="lab" data-k="${l.k}" value="${esc(S.profile.labs[l.k] ?? "")}" placeholder="–"><span class="unit">${esc(l.unit)}</span></span></label>`).join(""), "Enter your most recent value. For yes/no tests, 1 means positive and 0 negative.");
+  h += group("Anything else we should know?", `<div class="row"><textarea id="history-notes" data-act="historyNotes" rows="5" aria-label="Anything else we should know" placeholder="Other diagnoses, past treatments and how they went, family history, what you think started it, anything the questions above missed">${esc(S.profile.historyNotes || "")}</textarea></div>`,
+    "Included in your Report for AI. Saved as you type.");
   return h;
 }
 
@@ -666,6 +668,7 @@ document.addEventListener("input", e => {
   } else if (a === "libq") {
     UI.libQuery = t.value; const pos = t.selectionStart; render(); const n = $("#libq"); n.focus(); n.setSelectionRange(pos, pos);
   } else if (a === "notes") { touchDay(date).notes = t.value; commitDay(date); }
+  else if (a === "historyNotes") { S.profile.historyNotes = t.value; Store.saveProfile(); }
 });
 
 document.addEventListener("change", e => {
