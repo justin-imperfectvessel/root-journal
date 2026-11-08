@@ -77,7 +77,9 @@ function reportBrief(P, T, ppm) {
     .filter(x => x.hits).sort((a, b) => b.hits - a.hits).slice(0, 6).map(x => x.e);
 
   H(2, "Part 1 · Instructions for the AI");
-  P("I have SIBO/IMO (small intestinal bacterial or methanogen overgrowth) symptoms. I track my gut every day in Case File and work with a naturopath. Please act as my careful research partner, not my doctor: don't diagnose or prescribe, and frame suggestions as things to discuss with my practitioner.");
+  P("I have SIBO/IMO (small intestinal bacterial or methanogen overgrowth) symptoms. I track my gut every day in Case File and work with a naturopath. Please act as my careful research partner.");
+  P("");
+  P("**Before you start:** this report is step one. After it, I'll upload the relevant testing I've had done so you can get the full picture. When you've read the report, don't analyse anything yet. Reply only with: \"Got it. Waiting for your tests. Upload them when you're ready, or say 'go' to start without them.\" Once I've uploaded them (or said \"go\"), read the tests alongside the report and give your first reply in the shape below.");
   P("");
   P("**What's in this report**");
   P("- Part 1 (this part): how to help me, and the shape of your first reply.");
@@ -95,7 +97,7 @@ function reportBrief(P, T, ppm) {
   P("- Prefer one clear recommendation over a long menu, and say what would change your mind.");
   P("- Use plain language. Explain any medical term the first time you use it. Keep it short unless I ask for more.");
   P("");
-  P("**Your first reply, in this shape:**");
+  P("**Your first reply, once you have my tests (or I say \"go\"), in this shape:**");
   P("1. **My situation in plain words:** 4-6 sentences on where I am now and how I got here.");
   P("2. **What seems to be driving it:** my top 2-3 likely root causes, each with the evidence from my data and how sure you are.");
   P("3. **How my current protocol is going:** verdict (working / not yet / not working / came back) with the numbers, and whether you agree with the app's check. If nothing is running, what the last one taught us.");
@@ -181,7 +183,7 @@ function buildReport(range) {
   P("");
   P(`Made ${fmtDate(todayStr(), { year: "numeric", month: "long", day: "numeric" })} with Case File, a private gut journal. ${dates.length ? `Covers ${dates.length} logged days, ${dates[0]} to ${dates[dates.length - 1]}.` : "No days logged yet."}`);
   P("");
-  P("> **To use this:** paste the whole report into a new chat with Claude, ChatGPT or another AI. It will reply with a plain-language summary and a numbered list of questions you can ask next. Reply with a number, or ask your own.");
+  P("> **To use this:** paste the whole report into a new chat with Claude, ChatGPT or another AI. It will confirm and wait for your test results. Upload them (PDFs or photos of breath tests, stool tests, bloodwork), or type \"go\" if you have none to add. It then replies with a plain-language summary and a numbered list of questions you can ask next. Reply with a number, or ask your own.");
   reportBrief(P, T, ppmUnit);
   out.push("", "## Part 4 · My data");
 
@@ -279,6 +281,7 @@ function buildReport(range) {
     H("Daily log");
     dates.forEach(dt => { out.push(...reportDayLines(dt, map), ""); });
   }
+  out.push("", "## Next: my test results", "", "That's the end of the report. Next, I'll upload the relevant testing I've had done so you can get the full picture. For each test, note the date and compare it with what the report shows around that time. Please reply only \"Got it. Waiting for your tests.\" for now.");
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }
 
@@ -288,7 +291,7 @@ function viewReport() {
   const words = text.split(/\s+/).length;
   UI.reportText = text;
   return `<div class="spacer"></div>` +
-    group("", `<div class="row prose">One report with everything an AI needs: instructions, the research behind the app (filtered to your top root causes and protocols), key terms, then your history, tests, protocols and every logged day. Paste it into Claude, ChatGPT or another AI. It replies with a plain summary and numbered questions you can ask next.</div>
+    group("", `<div class="row prose">One report with everything an AI needs: instructions, the research behind the app (filtered to your top root causes and protocols), key terms, then your history, tests, protocols and every logged day. Paste it into Claude, ChatGPT or another AI. It confirms and waits for you to upload your test results, then replies with a plain summary and numbered questions you can ask next.</div>
       <div class="row field-row"><span class="row-label">Include</span>${seg("Range", REPORT_RANGES, range, "reportRange")}</div>
       <div class="row"><span class="row-sub">${n} days · about ${words.toLocaleString()} words</span></div>`) +
     group("", `<button type="button" class="row action" data-act="reportCopy">${icon("check", "lead")}<span class="row-label">Copy report</span></button>` +
