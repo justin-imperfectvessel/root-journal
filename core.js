@@ -40,7 +40,8 @@ const BRISTOL = ["", "Hard lumps", "Lumpy sausage", "Cracked sausage", "Smooth, 
 const BM_SIZE = { s: ["Small", "Under ½ cup"], m: ["Medium", "½ to 1 cup"], l: ["Large", "Over 1 cup"] };
 // BM flags: [key, switch label, short label]
 const BM_FLAGS = [["urgency", "Urgent", "urgent"], ["incomplete", "Incomplete", "incomplete"], ["straining", "Straining", "straining"], ["enema", "Needed an enema", "after an enema"],
-  ["mucus", "Mucus", "mucus"], ["floating", "Floating or oily", "floating or oily"], ["blood", "Blood", "blood"]];
+  ["mucus", "Mucus", "mucus"], ["floating", "Floating", "floating"], ["oily", "Oily or greasy", "oily"],
+  ["pale", "Pale or clay-coloured", "pale"], ["undigested", "Undigested food", "undigested food"], ["blood", "Blood", "blood"]];
 const bmFlagText = b => BM_FLAGS.filter(([k]) => b[k]).map(f => f[2]);
 const PROTO_KINDS = [["antimicrobial", "Antimicrobial"], ["prokinetic", "Prokinetic"], ["diet", "Diet"], ["support", "Support / supplements"], ["lifestyle", "Lifestyle / nervous system"], ["other", "Other experiment"]];
 const CHALLENGES = ["", "Meal", "Lactulose", "Glucose", "Inulin", "Fructose", "Lactose", "Sorbitol"];
@@ -283,7 +284,13 @@ function analyze() {
     F.constipation = clamp(bmDays.filter(d => d.noBM || d.bms.some(b => (b.bristol && b.bristol <= 2) || b.enema)).length / bmDays.length / 0.5);
     F.diarrhea = clamp(bmDays.filter(d => d.bms.some(b => b.bristol >= 6)).length / bmDays.length / 0.4);
     const bms = bmDays.flatMap(d => d.bms);
-    if (bms.length >= 5) F.incomplete = clamp(bms.filter(b => b.incomplete || b.straining).length / bms.length / 0.5);
+    if (bms.length >= 5) {
+      const rate = k => bms.filter(b => b[k]).length / bms.length;
+      F.incomplete = clamp(bms.filter(b => b.incomplete || b.straining).length / bms.length / 0.5);
+      F.oily_stool = clamp(rate("oily") / 0.25);
+      F.pale_stool = clamp(rate("pale") / 0.2);
+      F.undigested = clamp(rate("undigested") / 0.25);
+    }
   }
   // breath
   const T = thresholds();

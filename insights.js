@@ -355,17 +355,32 @@ const RULES = [
       why: "Some overgrowths make hydrogen sulfide instead of, or as well as, hydrogen and methane. Home devices like the FoodMarble don't measure it, so bad days with flat readings can be a clue. Rotten-egg gas, urgency, and reactions to high-sulfur foods are typical.",
       ask: ["Would a three-gas breath test that includes hydrogen sulfide help?"] };
   },
+  function stoolWarning(X) {
+    const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+    const bms = X.A.days.filter(d => d.date >= since).flatMap(d => d.bms || []);
+    const blood = bms.filter(b => b.blood).length, pale = bms.filter(b => b.pale).length;
+    if (blood < 1 && pale < 2) return null;
+    const ev = [];
+    if (blood) ev.push(["Journal", `Blood marked on ${blood} BM${blood > 1 ? "s" : ""} in the last 30 days`]);
+    if (pale >= 2) ev.push(["Journal", `Pale or clay-coloured stool marked on ${pale} BMs in the last 30 days`]);
+    return { id: "stool-warning", kind: "ask", conf: "moderate", drivers: pale >= 2 ? ["bile"] : [],
+      title: blood && pale >= 2 ? "Tell your doctor about blood and pale stools" : blood ? "Tell your doctor about blood in your stool" : "Tell your doctor about pale stools",
+      summary: "These are worth a prompt check with a doctor, separate from your SIBO plan.", evidence: ev,
+      why: (blood ? "Blood can come from something minor like a hemorrhoid or a small tear, but it should be checked, especially if it's dark, mixed through the stool, or keeps happening. " : "") + (pale >= 2 ? "Pale, clay-coloured or grey stools can mean bile isn't reaching the gut. Sometimes that's diet or a supplement such as bismuth, but repeated pale stools, especially with dark urine, itching or yellow skin or eyes, need checking soon." : ""),
+      ask: [blood ? "Should I have the blood in my stool looked into?" : null, pale >= 2 ? "Could my pale stools mean a bile flow problem? Should I have a liver panel?" : null].filter(Boolean) };
+  },
   function fat(X) {
     const fx = X.st.groupFx.fat, sup = ["fatty_stool", "gallbladder_removed", "pancreatitis"].filter(k => X.yes(k));
     const strong = fx && fx.diff >= 0.8 && fx.conf && fx.conf !== "low", el = X.labFlag("elastase") >= 0.7;
-    if (!strong && !sup.length && !el) return null;
-    if (!strong && sup.length + (el ? 1 : 0) < 1) return null;
+    const stool = ["oily_stool", "pale_stool", "undigested"].filter(k => (X.F[k] || 0) >= 0.5);
+    if (!strong && !sup.length && !el && !stool.length) return null;
     const ev = [];
+    stool.forEach(k => ev.push(["Journal", FEATURES[k]]));
     if (strong) ev.push(["Journal", `Fatty meals (${X.st.groupFoods.fat.slice(0, 4).join(", ")}): ${fxText(fx)}`]);
     sup.forEach(k => ev.push(["History", `You said yes: ${INTAKEMAP[k].q}`]));
     if (el) ev.push(["Lab", `Stool elastase ${S.profile.labs.elastase} µg/g`]);
     if (!strong && ev.length < 2) return null;
-    return { id: "fat", kind: "ask", conf: strong && ev.length > 1 ? "moderate" : "low", drivers: ["bile", "pancreatic"], test: strong ? "lower_fat" : null,
+    return { id: "fat", kind: "ask", conf: (strong || stool.length) && ev.length > 1 ? "moderate" : "low", drivers: ["bile", "pancreatic"], test: strong ? "lower_fat" : null,
       title: "Fat digestion may need a look",
       summary: "Bile and pancreatic enzymes help keep the small bowel clean, not just digest fat.", evidence: ev,
       why: "Bile acids and pancreatic enzymes are antimicrobial as well as digestive. When either runs low, fat is poorly absorbed and bacteria meet less resistance in the small bowel.",
