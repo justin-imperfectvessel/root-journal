@@ -1,5 +1,6 @@
-/* Case File — report for AI: everything in the journal as one plain-text (Markdown) report,
-   with instructions at the top, to paste into any AI chat and look for patterns and root causes.
+/* Case File — report for AI: one self-contained plain-text (Markdown) report to paste into any AI chat.
+   Part 1 tells the AI how to help and what its first reply should look like; Part 2 is the research
+   behind the app, filtered to this person; Part 3 explains terms; Part 4 is the data.
    Built on this device; nothing is sent anywhere unless the person copies, shares or saves it.
    Loaded after supplements.js; shares its global scope. */
 
@@ -17,7 +18,7 @@ const kv = o => Object.entries(o).filter(([, v]) => v !== undefined && v !== nul
 function reportDayLines(date, map) {
   const d = S.days[date], L = [], sc = dayScore(d);
   const syms = S.profile.symptoms.filter(s => typeof d.symptoms[s.k] === "number").map(s => `${s.name} ${d.symptoms[s.k]}`);
-  L.push(`### ${date} (${fmtDate(date, { weekday: "short" })})${sc == null ? "" : ` · day score ${r1(sc)}`}`);
+  L.push(`#### ${date} (${fmtDate(date, { weekday: "short" })})${sc == null ? "" : ` · day score ${r1(sc)}`}`);
   if (typeof d.overall === "number") L.push(`- Overall gut day: ${d.overall}/10`);
   if (syms.length) L.push(`- Symptoms (0–10): ${syms.join(", ")}`);
   // food by meal, in the order eaten
@@ -47,27 +48,142 @@ function reportDayLines(date, map) {
   return L;
 }
 
+// Library protocols that match what the person has used, by name or items
+const LIB_MATCH = [
+  ["Rifaximin (Xifaxan)", /rifaximin|xifaxan/], ["Rifaximin + neomycin", /neomycin/], ["Rifaximin + PHGG", t => /rifaximin|xifaxan/.test(t) && /phgg|guar|sunfiber/.test(t)],
+  ["Herbal antimicrobials", /berberine|oregano|neem|candibactin|dysbiocide|fc-?cidal|biocidin|herbal antimicrobial/], ["Allicin (stabilized garlic extract)", /allicin|allimed|garlic extract/],
+  ["Atrantil", /atrantil/], ["Elemental diet", /elemental/], ["Low FODMAP / SIBO-specific diet", /fodmap|sibo[- ]specific|bi-?phasic|\bscd\b|fast tract/],
+  ["Low-sulfur diet + bismuth", /low[- ]sulfur|bismuth|pepto/], ["Prucalopride", /prucalopride|motegrity|resotran/], ["Low-dose erythromycin", /erythromycin/],
+  ["Low-dose naltrexone (LDN)", /naltrexone|\bldn\b/], ["Ginger + artichoke", /ginger|artichoke|motilpro|prokinecta/], ["Iberogast (STW 5)", /iberogast|stw ?5/],
+  ["Meal spacing (MMC support)", /meal spacing|\bmmc\b|no snacking/], ["PHGG (partially hydrolyzed guar gum)", /phgg|guar|sunfiber/],
+  ["Probiotics (S. boulardii, select strains)", /probiotic|boulardii|florastor|lactobac|bifido/], ["Gut-directed hypnotherapy", /hypno|nerva\b/],
+  ["Vagal toning", /vagal|vagus|humming|gargl/], ["Digestive support (HCl, enzymes, bile)", /\bhcl\b|betaine|enzyme|ox bile|tudca|bitters/],
+  ["Pelvic floor PT / biofeedback", /pelvic floor|biofeedback/], ["Visceral manipulation", /visceral/], ["Antifungal trial", /fluconazole|nystatin|antifungal|caprylic/],
+  ["Mast cell support", /mast cell|ketotifen|cromolyn|quercetin|antihistamine/],
+];
+function reportLibProtocols() {
+  const map = lib();
+  const text = S.profile.protocols.filter(p => p.start).map(p => [p.name, p.notes || "", ...p.itemIds.map(id => map[id] ? map[id].name : "")].join(" ")).join(" ").toLowerCase();
+  return LIB_MATCH.filter(([, m]) => typeof m === "function" ? m(text) : m.test(text)).map(([n]) => PROTOCOLS.find(x => x.name === n)).filter(Boolean);
+}
+
+// Parts 1-3 of the report: instructions for the AI, the research behind the app (filtered to this person), key terms
+function reportBrief(P, T, ppm) {
+  const H = (n, s) => P(`\n${"#".repeat(n)} ${s}\n`);
+  const ranked = scoreDrivers(analyze().F).filter(r => ["strong", "likely", "possible"].includes(r.level)).slice(0, 5);
+  const protos = reportLibProtocols();
+  const driverIds = ranked.map(r => r.d.id), protoNames = protos.map(x => x.name);
+  const experts = EXPERTS.map(e => ({ e, hits: e.drivers.filter(id => driverIds.includes(id)).length + e.protocols.filter(n => protoNames.includes(n)).length }))
+    .filter(x => x.hits).sort((a, b) => b.hits - a.hits).slice(0, 6).map(x => x.e);
+
+  H(2, "Part 1 · Instructions for the AI");
+  P("I have SIBO/IMO (small intestinal bacterial or methanogen overgrowth) symptoms. I track my gut every day in Case File and work with a naturopath. Please act as my careful research partner, not my doctor: don't diagnose or prescribe, and frame suggestions as things to discuss with my practitioner.");
+  P("");
+  P("**What's in this report**");
+  P("- Part 1 (this part): how to help me, and the shape of your first reply.");
+  P("- Part 2: the research the app is built on: the experts and their approaches, my top-ranked root causes explained, the protocols I've used, and how the app reaches its conclusions.");
+  P("- Part 3: key terms and how to read my numbers.");
+  P("- Part 4: my data: where things stand now, health history, labs, a timeline of protocols (each with the app's own check), what the app's analysis found, then week-by-week and day-by-day logs, oldest first.");
+  P("");
+  P("**Sources, in this order:** (1) my data in Part 4, (2) the research in Part 2, (3) your own knowledge, only to add to those. Say when you go beyond Part 2, and flag anything newer, contested or weakly supported. Use Part 2's names for root causes and protocols so we're talking about the same things as the app.");
+  P("");
+  P("**How to answer**");
+  P("- Be specific to my numbers: dates, day scores, symptom changes, breath readings, how often I followed a protocol. If something rests on only a few days, say so.");
+  P("- Look for patterns across the daily log yourself (foods, meal timing, supplements, sleep, stress, the menstrual cycle, bowel movements), allowing for delays of 1-3 days. Weigh where things stand now and the most recent days most heavily.");
+  P("- When you suggest an approach, say whose work it draws on, their lens (Conventional, Integrative MD, Naturopathic, Functional, Diet researcher) and how strong the evidence is (strong, moderate, emerging). Where experts disagree, show both sides briefly.");
+  P("- Treat the app's protocol checks and insights as a second opinion: agree or disagree, and say why.");
+  P("- Prefer one clear recommendation over a long menu, and say what would change your mind.");
+  P("- Use plain language. Explain any medical term the first time you use it. Keep it short unless I ask for more.");
+  P("");
+  P("**Your first reply, in this shape:**");
+  P("1. **My situation in plain words:** 4-6 sentences on where I am now and how I got here.");
+  P("2. **What seems to be driving it:** my top 2-3 likely root causes, each with the evidence from my data and how sure you are.");
+  P("3. **How my current protocol is going:** verdict (working / not yet / not working / came back) with the numbers, and whether you agree with the app's check. If nothing is running, what the last one taught us.");
+  P("4. **Gaps and contradictions:** missing data or things that don't fit, and the one thing that would most sharpen the picture.");
+  P("5. **Questions you could ask me next:** 6-8 numbered questions, written in my voice, that I'd get the most out of asking you based on this report (for example \"Should I switch from herbs to rifaximin?\"). I'll reply with a number.");
+  P("6. **Questions for my naturopath:** 3-5 specific questions I can copy.");
+  P("");
+  P("**When I ask how a protocol is going later, use:** Verdict · What's helping or getting in the way · Options (stay, adjust or change course, with the one you'd pick and the expert approach behind each) · Questions for my naturopath · What to track next and for how long.");
+  P("");
+  P("**Safety first:** if anything in my data or messages includes blood in stool, black stools, repeated pale or clay-coloured stools, unintended weight loss, vomiting, fever, severe or worsening pain, trouble swallowing, or symptoms waking me at night, tell me to see a doctor promptly before anything else. Flag drug interactions and contraindications (for example magnesium with kidney disease, HCl with ulcers or NSAIDs, neomycin side effects) as needing my practitioner's sign-off. Doses in Part 2 are as studied, not recommendations.");
+
+  H(2, "Part 2 · The research behind this report");
+  const parts = [ranked.length ? `my top ${ranked.length} root cause${ranked.length > 1 ? "s" : ""}` : "", protos.length ? "the protocols I've used" : "", experts.length ? "the experts who work on them" : ""].filter(Boolean);
+  P(`Case File's knowledge base draws on ${EXPERTS.length} clinicians and researchers, ${DRIVERS.length} root causes and ${PROTOCOLS.length} protocols. ${parts.length ? `Only the parts that matter for me are included here: ${parts.join(", ")}.` : "Nothing ranks for me yet, so only how the app reasons is included here."}`);
+  H(3, "How the app reasons");
+  P("- **Root-cause ranking:** each root cause has weighted signals from my health history (yes = full weight, unsure = about a third), lab values and patterns in my journal. A cause needs at least one strong signal (weight 2+) to rank. Strong match = 5+ points, likely = 3+, possible = 1.5+.");
+  P("- **Day score:** my overall gut-day rating (0 best, 10 worst), or the average of my 3 worst symptoms if I didn't rate the day.");
+  P("- **Protocol check:** compares the 2 weeks before a protocol with its latest week. Improved = day score down 1.5+; worse = up 1.5+ in the first 2 weeks; no clear change = within 1 point after 10+ days; came back = improved, then back near the starting level within 60 days of stopping. Adherence under 60% means the result can't be trusted. It also checks the protocol matches my gas type, its length, prokinetic follow-up, and timing for a retest.");
+  P("- **Food and supplement effects:** compare a day (and the next 1-2 days) with the 2 weeks around it, so slow trends aren't mistaken for food reactions.");
+  P("- **Complete BMs per week:** bowel movements that felt fully emptied, without an enema. This is the main measure in constipation trials; 3+ a week is a common target.");
+  H(3, "Approaches (lenses) used to label each expert");
+  LENSES.forEach(([l, t]) => P(`- **${l}:** ${t}.`));
+  if (experts.length) {
+    H(3, "Experts most relevant to me");
+    for (const e of experts) {
+      P(`**${e.name}, ${e.creds}** · ${e.lens} · ${e.roles.join(", ")}`);
+      P(`- How they approach SIBO/IMO: ${e.approach}`);
+      P(`- Takeaways: ${e.takeaways.slice(0, 3).join(" ")}`);
+      if (e.caveat) P(`- Keep in mind: ${e.caveat}`);
+      P(`- Evidence behind it: ${e.basis}`);
+      P("");
+    }
+  }
+  if (ranked.length) {
+    H(3, "My top root causes, explained");
+    ranked.forEach((r, i) => {
+      const d = r.d, who = EXPERTS.filter(e => e.drivers.includes(d.id)).map(e => e.name);
+      P(`**${i + 1}. ${d.name}** · ${LEVEL_LABEL[r.level].toLowerCase()} (${r1(r.pts)} points) · evidence ${d.ev} · gas ${d.gas.length ? d.gas.join(", ") : "any"}`);
+      P(`- Why the app ranks it: ${r.why.map(w => w.label).join("; ") || "no signals listed"}`);
+      P(`- How it drives SIBO/IMO: ${d.mech}`);
+      P(`- Why treatment may not stick: ${d.stuck}`);
+      P(`- Tests to ask about: ${d.tests.join("; ")}`);
+      P(`- Approaches people use: ${d.approach.join("; ")}`);
+      if (who.length) P(`- Experts who work on it: ${who.join(", ")}`);
+      P("");
+    });
+  }
+  if (protos.length) {
+    H(3, "Protocols I've used, from the research library");
+    for (const x of protos) {
+      const who = EXPERTS.filter(e => e.protocols.includes(x.name)).map(e => e.name);
+      P(`**${x.name}** · ${x.type} · evidence ${x.ev} · gas ${x.gas.length ? x.gas.join(", ") : "any"}`);
+      P(`- What it is: ${x.what}`);
+      P(`- Best for: ${x.works}`);
+      P(`- Where it falls short: ${x.fails}`);
+      if (who.length) P(`- Experts who use or studied it: ${who.join(", ")}`);
+      P("");
+    }
+  }
+
+  H(2, "Part 3 · Key terms and how to read my numbers");
+  [
+    ["SIBO", "small intestinal bacterial overgrowth: too many bacteria in the small intestine, usually shown by hydrogen (H2) on a breath test."],
+    ["IMO", "intestinal methanogen overgrowth: methane-making microbes (archaea), shown by methane (CH4). Often linked to constipation."],
+    ["H2S", "hydrogen sulfide, a third gas some overgrowths make (rotten-egg smell, often loose stools). Home devices don't measure it."],
+    ["Root cause (driver)", "why the overgrowth happened or keeps coming back, such as slow gut movement (motility), low stomach acid or a structural issue."],
+    ["Prokinetic", "something that strengthens the gut's cleaning waves between meals (the migrating motor complex, MMC), used to prevent relapse."],
+    ["Symptoms, stress, overall gut day", "0-10, where 0 is none or best."],
+    ["Day score", "the overall gut day when given, otherwise the average of the 3 worst symptoms. 0 is best."],
+    ["Bristol stool type", "1-7: 1-2 hard (constipated), 3-4 ideal, 5-7 loose."],
+    ["BM size", "by volume; a cup is about the size of a fist."],
+    ["Felt complete", "whether a BM felt fully emptied: yes, partly or no."],
+    ["Breath readings", `${ppm ? "ppm from a breath test" : "FoodMarble home device levels, 0-10"}. The app treats H2 ≥ ${T.h2} and CH4 ≥ ${T.ch4} as elevated.`],
+    ["Adherence", "share of days every item in a protocol was ticked off."],
+    ["Times", "24-hour clock."],
+  ].forEach(([k, v]) => P(`- **${k}:** ${v}`));
+}
+
 function buildReport(range) {
-  const map = lib(), dates = reportDates(range), T = thresholds(), unit = S.profile.settings.unit === "ppm" ? "ppm" : "FoodMarble levels (0–10)";
-  const out = [], P = s => out.push(s), H = s => out.push("", `## ${s}`, "");
+  const map = lib(), dates = reportDates(range), T = thresholds(), ppmUnit = S.profile.settings.unit === "ppm";
+  const out = [], P = s => out.push(s), H = s => out.push("", `### ${s}`, "");
   P("# Case File: SIBO / IMO report");
   P("");
-  P(`Made ${fmtDate(todayStr(), { year: "numeric", month: "long", day: "numeric" })} with Case File. ${dates.length ? `Covers ${dates.length} logged days, ${dates[0]} to ${dates[dates.length - 1]}.` : "No days logged yet."}`);
-
-  H("Instructions for the AI");
-  P(`I have SIBO/IMO symptoms and keep a daily journal. The report runs: where things stand now, my health history, labs and tests, a timeline of the protocols I've tried (each with the app's check), what the app's analysis found, then my week-by-week and day-by-day log, oldest to newest. Please act as a careful research assistant, not a doctor. Don't diagnose or prescribe; frame what you find as things for me to discuss with my clinician.
-
-1. Look for patterns across the daily log: foods, meals and meal timing, supplements and medications, sleep, stress, the menstrual cycle and bowel movements, against symptoms and day scores. Allow for delays of 1–3 days, and for things that change together.
-2. Rank the most likely underlying drivers (root causes) of my SIBO/IMO. For each, cite the specific evidence from my history, labs and log, and say what would make it more or less likely.
-3. Say how each protocol I tried seems to have gone, and why it might have worked or not. Each protocol in the timeline has the app's own check under it: agree or disagree, and say what you'd change or ask my practitioner. Weigh the current situation ("Where things stand now" and the most recent days) most heavily when suggesting next steps.
-4. List what's missing or contradictory: data that would change the picture.
-5. Suggest specific tests and questions for my clinician, and 1–2 journal experiments (what to change, for how long, what to track).
-
-Use both Western (conventional) medicine and alternative and integrative approaches, such as functional medicine, naturopathy, herbal medicine, Traditional Chinese Medicine and Ayurveda, in how you explain what's going on and in what you suggest. For each idea, say which tradition it comes from and how strong the evidence behind it is.
-
-Be specific to my numbers. If a pattern rests on only a few days, say so.
-
-How to read the data: symptoms, the overall gut day and stress are 0–10, where 0 is none or best. The day score is the overall gut day when given, or else the average of the 3 worst symptoms. Bristol stool type runs 1–7: 1–2 hard, 3–4 ideal, 5–7 loose. BM size is by volume (a cup is about a fist). Breath readings are ${unit}; the app treats H2 ≥ ${T.h2} and CH4 ≥ ${T.ch4} as elevated. Times are 24-hour.`);
+  P(`Made ${fmtDate(todayStr(), { year: "numeric", month: "long", day: "numeric" })} with Case File, a private gut journal. ${dates.length ? `Covers ${dates.length} logged days, ${dates[0]} to ${dates[dates.length - 1]}.` : "No days logged yet."}`);
+  P("");
+  P("> **To use this:** paste the whole report into a new chat with Claude, ChatGPT or another AI. It will reply with a plain-language summary and a numbered list of questions you can ask next. Reply with a number, or ask your own.");
+  reportBrief(P, T, ppmUnit);
+  out.push("", "## Part 4 · My data");
 
   // where things stand now: the current picture first, so it isn't buried at the end of a long log
   const A = analyze(), sum = aiSummary();
@@ -101,7 +217,7 @@ How to read the data: symptoms, the overall gut day and stress are 0–10, where
   // labs and tests
   H("Labs and test results");
   const labs = Object.entries(S.profile.labs).filter(([, v]) => num(v) != null);
-  if (labs.length) { P("Latest values:"); labs.forEach(([k, v]) => { const l = LABMAP[k]; P(`- ${l ? l.name : k}: ${v}${l && l.unit ? ` ${l.unit}` : ""}`); }); }
+  if (labs.length) { P("Latest values:"); labs.forEach(([k, v]) => { const l = LABMAP[k]; P(`- ${l ? l.name : k}: ${v}${l && l.unit ? ` ${l.unit}` : ""}${l && l.hint ? ` (${l.hint})` : ""}`); }); }
   const res = (S.profile.results || []).slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   if (res.length) {
     if (labs.length) P("");
@@ -121,7 +237,7 @@ How to read the data: symptoms, the overall gut day and stress are 0–10, where
   for (const { p, s } of timeline) {
     const st = p.start ? protoStatus(p) : "draft", c = checkOf.get(p.id);
     P("");
-    P(`### ${p.start || "No start date"} to ${p.end || (st === "planned" ? "?" : "ongoing")}: ${p.name}`);
+    P(`#### ${p.start || "No start date"} to ${p.end || (st === "planned" ? "?" : "ongoing")}: ${p.name}`);
     P(`- Type: ${(PROTO_KINDS.find(k => k[0] === p.kind) || ["", "Other"])[1]}. Status: ${st}. Items: ${p.itemIds.map(id => map[id] && `${map[id].name}${doseLabel(map[id]) ? ` ${doseLabel(map[id])}` : ""}`).filter(Boolean).join(", ") || "none"}.`);
     if (p.start && st !== "planned" && !s.during.n) P("- No logged days during it (before logging here, or entered from memory).");
     else if (p.start && st !== "planned") P(`- Day score before ${r1(s.base.mean)} (${s.base.n} d), during ${r1(s.during.mean)} (${s.during.n} d), last 7 days ${r1(s.late.mean)}${s.after.n ? `, after ${r1(s.after.mean)} (${s.after.n} d)` : ""}. Adherence ${s.adherence == null ? "unknown" : Math.round(s.adherence * 100) + "%"}.`);
@@ -172,7 +288,7 @@ function viewReport() {
   const words = text.split(/\s+/).length;
   UI.reportText = text;
   return `<div class="spacer"></div>` +
-    group("", `<div class="row prose">One report with your history, test results, protocols, the app's findings and every logged day, with instructions at the top. Paste it into ChatGPT, Claude, Gemini or another AI and ask it to look for patterns and likely root causes.</div>
+    group("", `<div class="row prose">One report with everything an AI needs: instructions, the research behind the app (filtered to your top root causes and protocols), key terms, then your history, tests, protocols and every logged day. Paste it into Claude, ChatGPT or another AI. It replies with a plain summary and numbered questions you can ask next.</div>
       <div class="row field-row"><span class="row-label">Include</span>${seg("Range", REPORT_RANGES, range, "reportRange")}</div>
       <div class="row"><span class="row-sub">${n} days · about ${words.toLocaleString()} words</span></div>`) +
     group("", `<button type="button" class="row action" data-act="reportCopy">${icon("check", "lead")}<span class="row-label">Copy report</span></button>` +
