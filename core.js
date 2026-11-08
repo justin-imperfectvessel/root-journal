@@ -39,10 +39,26 @@ const BRISTOL = ["", "Hard lumps", "Lumpy sausage", "Cracked sausage", "Smooth, 
 // Stool amount by volume, as on clinical bowel records (a cup is about a fist)
 const BM_SIZE = { s: ["Small", "Under ½ cup"], m: ["Medium", "½ to 1 cup"], l: ["Large", "Over 1 cup"] };
 // BM flags: [key, switch label, short label]
-const BM_FLAGS = [["urgency", "Urgent", "urgent"], ["incomplete", "Incomplete", "incomplete"], ["straining", "Straining", "straining"], ["enema", "Needed an enema", "after an enema"],
+const BM_FLAGS = [["urgency", "Urgent", "urgent"], ["straining", "Straining", "straining"], ["enema", "Needed an enema", "after an enema"],
   ["mucus", "Mucus", "mucus"], ["floating", "Floating", "floating"], ["oily", "Oily or greasy", "oily"],
   ["pale", "Pale or clay-coloured", "pale"], ["undigested", "Undigested food", "undigested food"], ["blood", "Blood", "blood"]];
-const bmFlagText = b => BM_FLAGS.filter(([k]) => b[k]).map(f => f[2]);
+// "Felt complete?" per BM. Older entries only had an "incomplete" switch, which reads as "n".
+const BM_COMPLETE = { y: ["Yes", "felt complete"], p: ["Partly", "partly complete"], n: ["No", "incomplete"] };
+const bmComplete = b => (b.complete && BM_COMPLETE[b.complete]) ? b.complete : b.incomplete ? "n" : "";
+const bmFlagText = b => [bmComplete(b) && BM_COMPLETE[bmComplete(b)][1], ...BM_FLAGS.filter(([k]) => b[k]).map(f => f[2])].filter(Boolean);
+// Complete BMs per week (felt complete, no enema) over a date range: the measure used in constipation trials.
+// Unanswered BMs are filled in at the answered rate, so a few skipped answers don't drag the count down.
+function completeBMs(a, b) {
+  let days = 0, total = 0, answered = 0, yes = 0;
+  for (let d = a; d <= b; d = addDays(d, 1)) {
+    const day = S.days[d];
+    if (!day || !(day.bms.length || day.noBM)) continue;
+    days++;
+    for (const x of day.bms) { total++; const c = bmComplete(x); if (c) { answered++; if (c === "y" && !x.enema) yes++; } }
+  }
+  if (days < 4 || answered < 3 || answered < total * 0.5) return null;
+  return { perWeek: (yes / answered) * total / days * 7, days, answered, total };
+}
 const PROTO_KINDS = [["antimicrobial", "Antimicrobial"], ["prokinetic", "Prokinetic"], ["diet", "Diet"], ["support", "Support / supplements"], ["lifestyle", "Lifestyle / nervous system"], ["other", "Other experiment"]];
 const CHALLENGES = ["", "Meal", "Lactulose", "Glucose", "Inulin", "Fructose", "Lactose", "Sorbitol"];
 
@@ -286,7 +302,7 @@ function analyze() {
     const bms = bmDays.flatMap(d => d.bms);
     if (bms.length >= 5) {
       const rate = k => bms.filter(b => b[k]).length / bms.length;
-      F.incomplete = clamp(bms.filter(b => b.incomplete || b.straining).length / bms.length / 0.5);
+      F.incomplete = clamp(bms.reduce((t, b) => t + (b.straining || bmComplete(b) === "n" ? 1 : bmComplete(b) === "p" ? 0.5 : 0), 0) / bms.length / 0.5);
       F.oily_stool = clamp(rate("oily") / 0.25);
       F.pale_stool = clamp(rate("pale") / 0.2);
       F.undigested = clamp(rate("undigested") / 0.25);
@@ -455,7 +471,7 @@ function sampleState() {
     const b = clamp(Math.round(base + (trig ? 1.5 : 0) + (rnd() - 0.5) * 2), 0, 10);
     d.symptoms = { bloating: b, distension: clamp(b - 1, 0, 10), gas: clamp(b - 2 + Math.round(rnd() * 2), 0, 10), pain: clamp(b - 3, 0, 10), fatigue: 4 + Math.round(rnd() * 3), brainfog: 3 + Math.round(rnd() * 3) };
     const bristol = onK ? 3 + Math.round(rnd()) : onP && rnd() > 0.5 ? 3 : 2 - Math.round(rnd());
-    if (rnd() > 0.2) d.bms.push({ id: newId(), time: "08:15", bristol: Math.max(1, bristol), size: onK ? "m" : rnd() > 0.5 ? "s" : "m", incomplete: !onK && rnd() > 0.4, straining: !onK && rnd() > 0.5, urgency: false }); else d.noBM = true;
+    if (rnd() > 0.2) d.bms.push({ id: newId(), time: "08:15", bristol: Math.max(1, bristol), size: onK ? "m" : rnd() > 0.5 ? "s" : "m", complete: onK ? (rnd() > 0.3 ? "y" : "p") : rnd() > 0.6 ? "p" : "n", straining: !onK && rnd() > 0.5, urgency: false }); else d.noBM = true;
     if (i % 2 === 0) {
       const c = onP ? Math.max(2, 7 - (i - 15) * 0.18) : 7;
       d.breath.push({ id: newId(), time: "07:30", ctx: "fasting", mins: "", ch: "", h2: Math.round(rnd() * 2), ch4: Math.round(c + rnd()) });

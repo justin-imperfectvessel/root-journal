@@ -275,6 +275,8 @@ function viewTrends() {
       <div class="tile"><span class="tile-k">Trend</span><span class="tile-v ${delta == null ? "" : delta < -0.3 ? "good" : delta > 0.3 ? "bad" : ""}">${delta == null ? "–" : (delta > 0 ? "+" : "") + r1(delta)}</span><span class="tile-s">2nd half vs 1st</span></div>
       <div class="tile"><span class="tile-k">Days logged</span><span class="tile-v">${span.filter(d => S.days[d]).length}<small>/${span.length}</small></span><span class="tile-s">in this range</span></div>
       <div class="tile"><span class="tile-k">BMs per day</span><span class="tile-v">${r1(mean(bmDays.map(d => S.days[d].bms.length)))}</span><span class="tile-s">${bmDays.length} days tracked</span></div>
+      ${(() => { const c = completeBMs(start, end), hard = constipationRate(start, end); return `<div class="tile"><span class="tile-k">Complete BMs</span><span class="tile-v ${c == null ? "" : c.perWeek >= 3 ? "good" : c.perWeek < 1 ? "bad" : ""}">${c == null ? "–" : r1(c.perWeek)}<small>/wk</small></span><span class="tile-s">${c == null ? "answer “Felt complete?”" : "felt complete, no enema"}</span></div>
+      <div class="tile"><span class="tile-k">Hard or missed</span><span class="tile-v">${hard == null ? "–" : Math.round(hard * 100) + "%"}</span><span class="tile-s">of days tracked</span></div>`; })()}
     </div>`;
   h += group("Day score", `<div class="row chart-row">${lineChart(span, scores)}</div>`, S.profile.protocols.length ? "Shaded bands are protocols." : "");
   const breath = span.map(d => { const bb = S.days[d] ? S.days[d].breath : []; return { h2: bb.length ? Math.max(...bb.map(r => num(r.h2) || 0)) : null, ch4: bb.length ? Math.max(...bb.map(r => num(r.ch4) || 0)) : null }; });
@@ -527,6 +529,9 @@ function renderSheet() {
       <h3 class="sheet-h3">Size</h3>
       <div class="bristol-grid size-grid" role="radiogroup" aria-label="Size">${Object.entries(BM_SIZE).map(([v, [n, l]]) => `<label class="bt"><input type="radio" name="size" value="${v}" ${b.size === v ? "checked" : ""}><span class="bt-n">${n[0]}</span><span class="bt-l"><b>${n}</b><br>${l}</span></label>`).join("")}</div>
       <p class="bristol-key">A cup is about the size of your fist</p>
+      <h3 class="sheet-h3">Felt complete?</h3>
+      <div class="bristol-grid size-grid complete-grid" role="radiogroup" aria-label="Felt complete">${Object.entries(BM_COMPLETE).map(([v, [n]]) => `<label class="bt"><input type="radio" name="complete" value="${v}" ${bmComplete(b) === v ? "checked" : ""}><span class="bt-n">${n}</span></label>`).join("")}</div>
+      <p class="bristol-key">Did you feel fully emptied afterwards?</p>
       <div class="list">${BM_FLAGS.map(([f, n]) => `<label class="row" for="sh-${f}"><span class="row-label">${n}</span><input type="checkbox" role="switch" class="switch" id="sh-${f}" name="${f}" ${b[f] ? "checked" : ""}></label>`).join("")}</div>`;
     if (s.bm) del = `<button type="button" class="btn destructive block" data-act="delBM" data-id="${s.bm.id}">Delete bowel movement</button>`;
   } else if (s.k === "breath") {
@@ -738,6 +743,8 @@ function submitSheet(fd) {
     const day = touchDay(date), b = s.bm || { id: newId() };
     Object.assign(b, { time: fd.get("time") || "", bristol: fd.get("bristol") ? Number(fd.get("bristol")) : null, size: BM_SIZE[fd.get("size")] ? fd.get("size") : "" });
     BM_FLAGS.forEach(([k]) => { b[k] = fd.get(k) === "on"; });
+    b.complete = BM_COMPLETE[fd.get("complete")] ? fd.get("complete") : "";
+    delete b.incomplete;
     const i = day.bms.findIndex(x => x.id === b.id);
     if (i >= 0) day.bms[i] = b; else day.bms.push(b);
     day.bms.sort((x, y) => (x.time || "").localeCompare(y.time || ""));

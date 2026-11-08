@@ -147,7 +147,7 @@ window.KB = (function () {
     overnight_gap_short: "Your overnight gap without food is often under 12 hours",
     constipation: "Your BM log shows hard stools (Bristol 1-2), days with no BM, or BMs that needed an enema",
     diarrhea: "Your BM log shows frequent loose stools (Bristol 6-7)",
-    incomplete: "You often mark BMs as incomplete or straining",
+    incomplete: "You often strain, or mark BMs as not (or only partly) complete",
     oily_stool: "You often mark BMs as oily or greasy",
     pale_stool: "You often mark BMs as pale or clay-coloured",
     undigested: "You often see undigested food in your BMs",

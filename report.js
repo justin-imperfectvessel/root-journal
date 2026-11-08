@@ -80,7 +80,8 @@ How to read the data: symptoms, the overall gut day and stress are 0–10, where
     .filter(x => x.m != null && x.m >= 2).sort((a, b) => b.m - a.m).slice(0, 4);
   if (symNow.length) P(`- **Main symptoms lately:** ${symNow.map(x => `${x.name.toLowerCase()} ${r1(x.m)}`).join(", ")} (14-day averages, 0-10)`);
   const hardNow = constipationRate(addDays(t0, -13), t0);
-  if (hardNow != null) P(`- **Bowel movements lately:** hard stools or no BM on ${Math.round(hardNow * 100)}% of logged days`);
+  const cNow = completeBMs(addDays(t0, -13), t0), cPrev = completeBMs(addDays(t0, -27), addDays(t0, -14));
+  if (hardNow != null || cNow) P(`- **Bowel movements lately:** ${[hardNow != null ? `hard stools or no BM on ${Math.round(hardNow * 100)}% of logged days` : "", cNow ? `${r1(cNow.perWeek)} complete BMs a week (felt fully emptied, no enema)${cPrev ? `, compared with ${r1(cPrev.perWeek)} the 2 weeks before` : ""}` : ""].filter(Boolean).join("; ")}`);
   const current = S.profile.protocols.filter(p => p.start && ["active", "planned"].includes(protoStatus(p))).sort((a, b) => a.start.localeCompare(b.start));
   if (current.length) current.forEach(p => { const c = checkOf.get(p.id); P(`- **${protoStatus(p) === "planned" ? "Planned" : "Current"} protocol:** ${p.name}, ${protoStatus(p) === "planned" ? `starts ${p.start}` : `day ${c.days} (started ${p.start})`}. App's check: ${c.verdict.title}.`); });
   else P("- **Current protocols:** none running.");
@@ -150,13 +151,14 @@ How to read the data: symptoms, the overall gut day and stress are 0–10, where
   // weekly overview, then every day
   if (dates.length) {
     H("Week by week");
-    P("| Week of | Days logged | Avg day score | BMs per day | Avg Bristol |");
-    P("|---|---|---|---|---|");
+    P("| Week of | Days logged | Avg day score | BMs per day | Avg Bristol | Felt complete |");
+    P("|---|---|---|---|---|---|");
     const weeks = {};
     for (const dt of dates) { const dd = parseD(dt); dd.setDate(dd.getDate() - ((dd.getDay() + 6) % 7)); (weeks[ymd(dd)] ||= []).push(S.days[dt]); }
     for (const [wk, ds] of Object.entries(weeks)) {
       const sc = ds.map(dayScore).filter(v => v != null), bms = ds.flatMap(x => x.bms), br = bms.map(b => b.bristol).filter(Boolean);
-      P(`| ${wk} | ${ds.length} | ${sc.length ? r1(mean(sc)) : "–"} | ${r1(bms.length / ds.length)} | ${br.length ? r1(mean(br)) : "–"} |`);
+      const ans = bms.filter(b => bmComplete(b)), yes = ans.filter(b => bmComplete(b) === "y" && !b.enema).length;
+      P(`| ${wk} | ${ds.length} | ${sc.length ? r1(mean(sc)) : "–"} | ${r1(bms.length / ds.length)} | ${br.length ? r1(mean(br)) : "–"} | ${ans.length ? `${yes} of ${ans.length} BMs` : "–"} |`);
     }
     H("Daily log");
     dates.forEach(dt => { out.push(...reportDayLines(dt, map), ""); });

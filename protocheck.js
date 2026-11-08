@@ -74,6 +74,8 @@ function protocolCheck(p) {
   shifts.forEach(x => facts.push([x.diff < 0 ? "Better" : "Worse", `${x.name}: ${r1(x.before)} → ${r1(x.now)}`]));
   const cb = constipationRate(addDays(p.start, -14), addDays(p.start, -1)), cl = constipationRate(addDays(end, -13) > p.start ? addDays(end, -13) : p.start, end);
   if (cb != null && cl != null && Math.abs(cl - cb) >= 0.15) facts.push([cl < cb ? "Better" : "Worse", `Hard or missed BMs: ${Math.round(cb * 100)}% of days → ${Math.round(cl * 100)}%`]);
+  const kb = completeBMs(addDays(p.start, -14), addDays(p.start, -1)), kl = completeBMs(addDays(end, -13) > p.start ? addDays(end, -13) : p.start, end);
+  if (kb && kl && Math.abs(kl.perWeek - kb.perWeek) >= 1) facts.push([kl.perWeek > kb.perWeek ? "Better" : "Worse", `Complete BMs: ${r1(kb.perWeek)} a week → ${r1(kl.perWeek)}`]);
   const bc = breathShift(p, "ch4"), bh = breathShift(p, "h2");
   if (bc) facts.push(["Breath", `Methane ${r1(bc.before)} → ${r1(bc.now)} (FoodMarble ${S.profile.settings.unit === "ppm" ? "ppm" : "level"})`]);
   if (bh) facts.push(["Breath", `Hydrogen ${r1(bh.before)} → ${r1(bh.now)}`]);

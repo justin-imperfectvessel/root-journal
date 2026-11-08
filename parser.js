@@ -281,12 +281,15 @@
         const ty = s.match(/\b(?:type|bristol)\s*(\d)\b/);
         if (ty && Number(ty[1]) >= 1 && Number(ty[1]) <= 7) bristol = Number(ty[1]);
         else for (const [re, v] of BRISTOL) if (re.test(s)) { bristol = v; break; }
-        const flags = { urgency: /\burgen(?:t|cy)|rushed|had to run\b/.test(s), incomplete: /\bincomplete|not complete|didn't feel (?:empty|done|finished)|unfinished\b/.test(s),
+        const flags = { urgency: /\burgen(?:t|cy)|rushed|had to run\b/.test(s), 
           straining: /\bstrain(?:ed|ing)?|pushing|hard to go\b/.test(s), mucus: /\bmucus\b/.test(s), floating: /\bfloat(?:ing|ed|s|y)?\b|\bsinks? then floats?\b/.test(s), oily: /\b(?:oily|greasy|oil slick|oil on the water)\b/.test(s), pale: /\b(?:pale|clay|grey|gray|light[- ]colou?red|putty)\b/.test(s), undigested: /\bundigested\b|\b(?:bits|pieces|chunks) of (?:food|corn|veg|vegetables|carrot)\b/.test(s), blood: /\bblood(?:y)?\b/.test(s), enema: /\benemas?\b/.test(s) };
+        const complete = /\bincomplete|not complete|didn'?t feel (?:empty|done|finished|complete)|unfinished|not empty\b/.test(s) ? "n"
+          : /\b(?:partly|partially|mostly) (?:complete|empty|emptied|done)|not fully (?:empty|emptied|done)|not quite (?:empty|done|complete)\b/.test(s) ? "p"
+          : /\b(?:felt|feel|feels|feeling) (?:complete|empty|emptied|done|finished)\b|fully emptied|complete (?:bm|one|evacuation)|satisfying\b/.test(s) ? "y" : "";
         const size = /\b(?:small|tiny|not much|barely anything)\b/.test(s) ? "s" : /\b(?:big|large|huge|massive|enormous)\b/.test(s) ? "l" : /\b(?:medium|normal size|average)\b/.test(s) ? "m" : "";
         const time = findTime(s);
         if (extra && !/\b(one|1|bm|poop|movement|stool)\b/.test(s)) continue;
-        for (let i = 0; i < n; i++) add({ kind: "bm", bm: { time: i === 0 ? time || "" : "", bristol, size, ...flags }, uncertain: bristol == null, why: bristol == null ? "Type not heard" : "" });
+        for (let i = 0; i < n; i++) add({ kind: "bm", bm: { time: i === 0 ? time || "" : "", bristol, size, complete, ...flags }, uncertain: bristol == null, why: bristol == null ? "Type not heard" : "" });
         markSent(whole);
       }
     }
