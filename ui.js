@@ -344,11 +344,21 @@ function viewProtocols() {
   const ps = [...S.profile.protocols].sort((a, b) => (b.start || "").localeCompare(a.start || ""));
   let h = largeTitle("Protocols");
   if (!ps.length) return h + emptyState("No protocols yet", "A protocol is anything you try for a stretch of time: an antimicrobial round, a prokinetic, a diet or meal spacing. Its items become a daily checklist, and the app compares how you did before, during and after.", "New protocol", "newProto");
-  for (const p of ps) {
+  const live = ps.filter(p => protoStatus(p) !== "ended");
+  const archived = ps.filter(p => protoStatus(p) === "ended").sort((a, b) => (b.end || "").localeCompare(a.end || ""));
+  if (archived.length) h += `<h2 class="group-h">Current</h2>`;
+  if (!live.length) h += `<section class="group"><div class="list"><div class="row"><span class="row-sub">Nothing running right now. Past protocols are archived below.</span></div></div></section>`;
+  const card = (p, compact) => {
     const s = protocolStats(p), st = protoStatus(p);
     const items = p.itemIds.map(id => map[id]).filter(Boolean);
     const tone = s.relapse ? "warn" : s.improved ? "good" : s.worse ? "bad" : "";
-    h += `<section class="group"><div class="list">
+    if (compact) return `<section class="group archived"><div class="list">
+      <div class="row proto-head"><span class="row-main"><span class="row-label strong">${esc(p.name)}</span><span class="row-sub">${esc((PROTO_KINDS.find(k => k[0] === p.kind) || ["", "Other"])[1])} · ${esc(fmtDate(p.start, { month: "short", day: "numeric", year: "numeric" }))} – ${esc(fmtDate(p.end, { month: "short", day: "numeric", year: "numeric" }))}${s.base.n && s.during.n ? ` · score ${r1(s.base.mean)} → ${r1(s.during.mean)}` : ""}</span></span>
+        <span class="status ${st}">${st}</span><button type="button" class="iconbtn" data-act="protoMenu" data-id="${p.id}" aria-label="Options for ${esc(p.name)}">${icon("ellipsis")}</button></div>
+      ${p.experiment ? `<div class="row verdict"><span class="row-label">Test: ${esc(experimentResult(p).text)}</span></div>` : `<div class="row verdict ${tone}"><span class="row-label">${esc(s.verdict)}</span></div>`}
+      ${navRow({ label: "Check this protocol", sub: "How it went and what to take forward", act: "push", attrs: `data-k="protocheck" data-id="${p.id}"` })}
+    </div></section>`;
+    return `<section class="group"><div class="list">
       <div class="row proto-head"><span class="row-main"><span class="row-label strong">${esc(p.name)}</span><span class="row-sub">${esc((PROTO_KINDS.find(k => k[0] === p.kind) || ["", "Other"])[1])} · ${p.start ? esc(fmtDate(p.start, { month: "short", day: "numeric" })) : "no start"} – ${p.end ? esc(fmtDate(p.end, { month: "short", day: "numeric" })) : "ongoing"}</span></span>
         <span class="status ${st}">${st}</span><button type="button" class="iconbtn" data-act="protoMenu" data-id="${p.id}" aria-label="Options for ${esc(p.name)}">${icon("ellipsis")}</button></div>
       ${items.length ? `<div class="row chips-row"><div class="chips">${items.map(i => `<span class="chip static">${esc(i.name)}${i.dose ? ` <em>${esc(i.dose)}</em>` : ""}</span>`).join("")}</div></div>` : ""}
@@ -361,7 +371,9 @@ function viewProtocols() {
       ${p.start ? navRow({ label: "Check this protocol", sub: "Is it working, what's missing, questions to ask", act: "push", attrs: `data-k="protocheck" data-id="${p.id}"` }) : ""}
       ${p.notes ? `<div class="row"><span class="row-sub">${esc(p.notes)}</span></div>` : ""}
     </div></section>`;
-  }
+  };
+  h += live.map(p => card(p, false)).join("");
+  if (archived.length) h += `<h2 class="group-h archive-h">Archived <span class="count">${archived.length}</span></h2>` + archived.map(p => card(p, true)).join("");
   return h + `<p class="footnote">Scores are day scores (0 best, 10 worst). "Before" is the 2 weeks before the start; "After" is up to 60 days after the end.</p>`;
 }
 
