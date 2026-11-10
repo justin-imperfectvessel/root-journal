@@ -65,7 +65,7 @@ function mealsHtml(d, date) {
     if (prev && m.time) h += gapRow(hrs(m.time) - hrs(prev.time), "day");
     const names = mealFoods(d, m.id).map(e => map[e.id] && map[e.id].name).filter(Boolean), n = x.byMeal[m.id];
     h += `<button type="button" class="row nav meal-card" data-act="mealEdit" data-mid="${m.id}"><span class="row-main"><span class="row-label">${MEAL_ONE[m.type]}${m.time ? ` <span class="meal-time">${esc(fmtTime(m.time))}</span>` : ` <span class="meal-time">no time</span>`}</span>
-      <span class="row-sub">${names.length ? esc(names.join(", ")) : "No foods yet"}</span></span><span class="row-value">${n && n.kcal ? `${fmtN(n.kcal)} kcal` : ""}</span>${icon("chevR", "chev")}</button>`;
+      <span class="row-sub">${names.length ? `${esc(lfdCountText(lfdCount(mealFoods(d, m.id).map(e => map[e.id]), map)))} · ${esc(names.join(", "))}` : "No foods yet"}</span></span><span class="row-value">${n && n.kcal ? `${fmtN(n.kcal)} kcal` : ""}</span>${icon("chevR", "chev")}</button>`;
     if (m.time) prev = m;
   }
   const have = new Set(ms.map(m => m.type));
@@ -97,8 +97,8 @@ function mealFoodsHtml(s) {
     const it = map[f.id]; if (!it) return "";
     const v = nutOf(it, f.q, f.u, map);
     return `<button type="button" class="row nav food-row" data-act="mfEdit" data-i="${i}"><span class="row-main"><span class="row-label">${esc(it.name)}</span>
-      <span class="row-sub">${v ? `${esc(fmtQU(f.q, f.u))} · ${fmtN(v.kcal)} kcal · ${fmtN(v.p)} g protein` : "No nutrition yet"}</span></span>${icon("chevR", "chev")}</button>`;
-  }).join("") + (measured ? `<div class="row nut-prev">${["kcal", "p", "f", "c", "fib"].map(k => `<span><b>${fmtN(n[k])}</b>${k === "kcal" ? " kcal" : " g " + NUT_INFO[k][0].toLowerCase()}</span>`).join("")}</div>` : "");
+      <span class="row-sub">${lfdLead(it, map)}${v ? `${esc(fmtQU(f.q, f.u))} · ${fmtN(v.kcal)} kcal · ${fmtN(v.p)} g protein` : "No nutrition yet"}</span></span>${icon("chevR", "chev")}</button>`;
+  }).join("") + `<div class="row lfd-day"><span class="row-sub">Low fermentation: ${esc(lfdCountText(lfdCount(dr.foods.map(f => map[f.id]), map)))}</span></div>` + (measured ? `<div class="row nut-prev">${["kcal", "p", "f", "c", "fib"].map(k => `<span><b>${fmtN(n[k])}</b>${k === "kcal" ? " kcal" : " g " + NUT_INFO[k][0].toLowerCase()}</span>`).join("")}</div>` : "");
 }
 function mealResultsHtml(s) {
   const q = (s.q || "").trim(), ql = q.toLowerCase(), dr = s.draft, inMeal = new Set(dr.foods.map(f => f.id));
@@ -107,19 +107,21 @@ function mealResultsHtml(s) {
     // usual foods for this meal first, then the ones logged most
     const uses = usageCounts();
     const pick = foods.slice().sort((a, b) => (b.meal === dr.type) - (a.meal === dr.type) || (uses[b.id] || 0) - (uses[a.id] || 0) || a.name.localeCompare(b.name)).slice(0, 14);
-    return pick.length ? `<h3 class="sheet-h3">Your foods</h3><div class="row chips-row"><div class="chips">${pick.map(i => `<button type="button" class="chip ${inMeal.has(i.id) ? "on" : ""}" data-act="mlAdd" data-id="${i.id}" aria-pressed="${inMeal.has(i.id)}">${inMeal.has(i.id) ? icon("check", "chk") : ""}${esc(i.name)}</button>`).join("")}</div></div>` : "";
+    return (pick.length ? `<h3 class="sheet-h3">Your foods</h3><div class="row chips-row"><div class="chips">${pick.map(i => `<button type="button" class="chip ${inMeal.has(i.id) ? "on" : ""}" data-act="mlAdd" data-id="${i.id}" aria-pressed="${inMeal.has(i.id)}">${inMeal.has(i.id) ? icon("check", "chk") : ""}${lfdBadge(lfdOf(i).r, { short: true })} ${esc(i.name)}</button>`).join("")}</div></div>` : "") +
+      `<div class="list"><button type="button" class="row action" data-act="mlScan">${icon("plus", "lead")}<span class="row-label">Scan a label or barcode</span></button></div>`;
   }
   const mine = foods.filter(i => i.name.toLowerCase().includes(ql)).slice(0, 6);
   let h = "";
-  if (mine.length) h += `<h3 class="sheet-h3">Your foods</h3><div class="list">${mine.map(i => `<button type="button" class="row nav" data-act="mlAdd" data-id="${i.id}"><span class="row-main"><span class="row-label">${esc(i.name)}</span><span class="row-sub">${inMeal.has(i.id) ? "In this meal" : hasNutrition(i) ? esc(fmtQU(usualOf(i).q, usualOf(i).u)) : "No nutrition yet"}</span></span>${icon(inMeal.has(i.id) ? "check" : "plus", "chev")}</button>`).join("")}</div>`;
+  if (mine.length) h += `<h3 class="sheet-h3">Your foods</h3><div class="list">${mine.map(i => `<button type="button" class="row nav" data-act="mlAdd" data-id="${i.id}"><span class="row-main"><span class="row-label">${esc(i.name)}</span><span class="row-sub">${lfdLead(i)}${inMeal.has(i.id) ? "In this meal" : hasNutrition(i) ? esc(fmtQU(usualOf(i).q, usualOf(i).u)) : "No nutrition yet"}</span></span>${icon(inMeal.has(i.id) ? "check" : "plus", "chev")}</button>`).join("")}</div>`;
   if (!Foods.data) h += `<div class="list"><div class="row"><span class="row-sub">${Foods.failed ? "Couldn't load the food database. Check your connection and try again; after one load it works offline." : "Loading the food database…"}</span></div></div>`;
   else if (q.length >= 2) {
     s.results = Foods.search(q);
-    h += `<h3 class="sheet-h3">USDA foods</h3><div class="list">${s.results.length ? s.results.map((f, i) => `<button type="button" class="row nav" data-act="mlPick" data-i="${i}"><span class="row-main"><span class="row-label">${esc(f.name)}</span><span class="row-sub">${f.portions[0] ? `${esc(f.portions[0][0])} · ${fmtN(f.nut.kcal * f.portions[0][1] / 100)} kcal` : `100 g · ${fmtN(f.nut.kcal)} kcal`}</span></span>${icon("chevR", "chev")}</button>`).join("")
+    h += `<h3 class="sheet-h3">USDA foods</h3><div class="list">${s.results.length ? s.results.map((f, i) => `<button type="button" class="row nav" data-act="mlPick" data-i="${i}"><span class="row-main"><span class="row-label">${esc(f.name)}</span><span class="row-sub">${lfdBadge(lfdText(f.name).r)} · ${f.portions[0] ? `${esc(f.portions[0][0])} · ${fmtN(f.nut.kcal * f.portions[0][1] / 100)} kcal` : `100 g · ${fmtN(f.nut.kcal)} kcal`}</span></span>${icon("chevR", "chev")}</button>`).join("")
       : `<div class="row"><span class="row-sub">No match. Try a simpler word, like "bread" or "chicken".</span></div>`}</div>`;
   }
   h += `<div class="list"><button type="button" class="row action" data-act="mlPlain">${icon("plus", "lead")}<span class="row-label">Add "${esc(q)}" without nutrition</span></button>
-    <button type="button" class="row action" data-act="mlLabel">${icon("plus", "lead")}<span class="row-label">Enter from a food label</span></button></div>`;
+    <button type="button" class="row action" data-act="mlScan">${icon("plus", "lead")}<span class="row-label">Scan a label or barcode</span></button>
+    <button type="button" class="row action" data-act="mlLabel">${icon("plus", "lead")}<span class="row-label">Enter nutrition from a food label</span></button></div>`;
   return h;
 }
 function refreshMealResults() {
@@ -139,7 +141,8 @@ function mealSheetParts(s) {
       body: `<div class="list">${hasNutrition(it) ? amountRows(portions, f.q, f.u) : `<div class="row"><span class="row-sub">This food has no nutrition yet. Add it once and every past and future entry counts.</span></div>`}</div>
         ${hasNutrition(it) ? `<div class="list">${previewHtml(it, f.q, f.u)}</div>` : ""}
         ${it.parts ? `<div class="list">${it.parts.map(p => map[p.id] ? `<div class="row"><span class="row-label">${esc(map[p.id].name)}</span><span class="row-value">${esc(fmtQU(p.q, p.u))}</span></div>` : "").join("")}</div>`
-          : `<div class="list"><button type="button" class="row action" data-act="mfLink">${icon(hasNutrition(it) ? "search" : "plus", "lead")}<span class="row-label">${hasNutrition(it) ? "Change nutrition match" : "Add nutrition"}</span></button></div>`}`,
+          : `<div class="list"><button type="button" class="row action" data-act="mfLink">${icon(hasNutrition(it) ? "search" : "plus", "lead")}<span class="row-label">${hasNutrition(it) ? "Change nutrition match" : "Add nutrition"}</span></button></div>`}
+        ${lfdPanel(it, map)}`,
       del: `<button type="button" class="btn destructive block" data-act="mfDel">Remove from this meal</button>` };
   }
   const canSave = dr.foods.length >= 2 && !dr.foods.some(f => map[f.id] && map[f.id].parts);

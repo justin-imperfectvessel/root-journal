@@ -888,5 +888,59 @@ window.KB = (function () {
     antimicrobial: /rifaximin|xifaxan|neomycin|metronidazole|flagyl|berberine|oregano|neem|allicin|allimed|candibactin|dysbiocide|fc-cidal|atrantil|biocidin|monolaurin|nystatin|fluconazole/i,
   };
 
-  return { INTAKE_GROUPS, INTAKE, LABS, FEATURES, DRIVERS, PROTOCOLS, LENSES, EXPERTS, GROUPS };
+  // Low Fermentation Diet (Dr. Mark Pimentel, Cedars-Sinai; "The Microbiome Connection", 2022).
+  // Rules run in order over a food name or an ingredient list. Each match is removed before the next rule runs,
+  // so exceptions ("almond milk", "green beans") come before general rules ("milk", "beans").
+  // A food's rating is the strictest of its matches. Where published guides disagree, the food is rated "limit" with a note.
+  const LFD = {
+    name: "Low Fermentation Diet",
+    source: "Dr. Mark Pimentel, Cedars-Sinai (The Microbiome Connection, 2022), as summarized by dietitian and clinic guides; guides differ on a few foods",
+    habits: ["Meals 4-5 hours apart, with nothing but water, plain tea or black coffee between", "Last meal at least 2 hours before bed"],
+    rules: [
+      // exceptions first
+      [/lactose[- ]free|(almond|coconut|rice|macadamia|hemp|cashew) milk|milk,? (almond|coconut|rice|macadamia|hemp|cashew|lactose[- ]free)/, "ok", "lactose-free"],
+      [/green beans?|string beans?|runner beans?|french beans?|bean sprouts|coffee beans?|vanilla beans?|cocoa beans?/, "ok", "not a legume"],
+      [/partially hydrolyzed guar|\bphgg\b|sunfiber/, "limit", "a fiber supplement, though Pimentel's group has studied it alongside rifaximin"],
+      [/sweet potato|potato bread|potato starch|\bpotato(es)?\b|\byams?\b/, "ok", "potatoes are allowed"],
+      [/peanut butter|almond butter|nut butter|\bnuts?\b|almonds?|cashews?|pistachios?|walnuts?|pecans?|peanuts?|hazelnuts?|macadamias?|brazil nuts?|\bseeds?\b|chia|flax|tahini/, "limit", "nuts and seeds in small amounts"],
+      [/\b(olive|coconut|avocado|canola|sunflower|sesame|grapeseed|vegetable|rapeseed|peanut|corn) oil\b|\boils?\b|\bghee\b|\bbutter\b|\blard\b|\btallow\b/, "ok", "fats and oils are allowed"],
+      // whole grains and fiber
+      [/whole[- ]?wheat|whole[- ]?grain|wholemeal|multi[- ]?grain|\bbran\b|brown rice|wild rice|\boats?\b|oatmeal|oat (milk|flour|bran)|rolled oats|granola|muesli|quinoa|barley|\brye\b|bulgur|farro|spelt|buckwheat|millet|amaranth/, "avoid", "whole grains"],
+      [/inulin|chicory|psyllium|metamucil|benefiber|fructo-?oligosaccharides?|\bfos\b|oligofructose|polydextrose|resistant dextrin|wheat dextrin|soluble corn fiber|added fiber|fibre supplement|fiber supplement/, "avoid", "added fiber"],
+      // legumes
+      [/\bbeans?\b|lentils?|chickpeas?|garbanzo|hummus|houmous|edamame|soy ?beans?|split peas?|black[- ]eyed|falafel|\bdh?al\b|pea protein|soy protein|legumes?|pulses?/, "avoid", "beans and legumes"],
+      [/\btofu\b|tempeh|\bnatto\b|\bmiso\b|soy milk/, "limit", "soy foods; guides differ"],
+      // cruciferous
+      [/broccol|broccoflower|romanesco|cauliflower|cabbage|\bkale\b|brussels|bok choy|pak choi|collard|arugula|rocket|radish|turnip|kohlrabi|watercress|sauerkraut|coleslaw|rapini|rutabaga|mustard greens/, "avoid", "cruciferous vegetables"],
+      // dairy
+      [/ice cream|\bmilk\b|milk solids|milk powder|\by[oa]gh?urt|cream cheese|cottage cheese|ricotta|\bkefir\b|custard|pudding|\bwhey\b|buttermilk|mascarpone|condensed milk|evaporated milk|soft cheese|fromage frais|quark/, "avoid", "lactose-containing dairy"],
+      [/\bcheese,? (cheddar|parmesan|swiss|gouda|gruy[eè]re|manchego|pecorino|romano|emmental|provolone)\b|(cheddar|parmesan|parmigiano|swiss|gouda|gruy[eè]re|manchego|pecorino|romano|emmental|comt[eé]|aged|hard|provolone)( cheese)?/, "ok", "hard, aged cheese is low in lactose"],
+      [/mozzarella|feta|brie|camembert|halloumi|\bcheese\b|sour cream|\bcream\b/, "limit", "some lactose; aged hard cheeses are the safer choice"],
+      // sweeteners and gums
+      [/sucralose|splenda|sorbitol|xylitol|maltitol|mannitol|erythritol|isomalt|lactitol|sugar alcohols?|polyols?|sugar[- ]free/, "avoid", "sugar alcohols and sucralose"],
+      [/xanthan( gum)?|gum arabic|arabic gum|acacia( gum)?|carrageenan/, "avoid", "gums"],
+      [/guar gum|locust bean gum|carob bean gum|cellulose gum|gellan|\bgums?\b/, "limit", "gums; guides list xanthan, arabic and carrageenan as the ones to avoid"],
+      [/high[- ]fructose|\bfructose\b|\bhoney\b|\bagave\b|corn syrup/, "limit", "free fructose"],
+      [/\bsugar\b|sucrose|\bglucose\b|dextrose|maple syrup|rice syrup/, "ok", "table sugar and glucose are allowed"],
+      // fruit
+      [/\bapples?\b|\bpears?\b|bananas?|mangos?|mangoes|watermelon|cherr(y|ies)|peach(es)?|plums?|nectarines?|apricots?|raisins?|\bdates?\b|prunes?|\bfigs?\b|dried fruit|persimmon|avocados?/, "limit", "higher-fructose or polyol fruit"],
+      [/berr(y|ies)|strawberr|blueberr|raspberr|blackberr|\boranges?\b|lemons?|\blimes?\b|grapes?|grapefruit|kiwi|pineapple|melon|cantaloupe|honeydew|papaya|clementine|mandarin|tangerine|passion ?fruit|rhubarb/, "ok", "most fruit is allowed"],
+      // vegetables
+      [/garlic|onions?|leeks?|shallots?|scallions?|spring onions?|green onions?|chives/, "limit", "guides disagree: some allow garlic and onion, others avoid them"],
+      [/pepper|tomato|carrots?|cucumbers?|zucchini|courgettes?|squash|pumpkin|eggplant|aubergine|spinach|lettuce|mushrooms?|\bpeas?\b|olives?|parsnips?|beets?|beetroot|celery|bok|bean sprouts|ginger|herbs?|basil|parsley|cilantro|coriander|oregano|thyme|rosemary|mint|dill/, "ok", "non-cruciferous vegetables and herbs are allowed"],
+      // fermented foods and drinks
+      [/kimchi|kombucha|pickled|fermented/, "limit", "fermented foods; some guides avoid them while overgrowth is active"],
+      [/\bbeer\b|\bwine\b|vodka|whisk(e)?y|\brum\b|\bgin\b|tequila|\bcider\b|alcohol|liquor|cocktail|spirits|prosecco|champagne|sake/, "limit", "alcohol is often restricted"],
+      [/\bsoda\b|\bcola\b|sparkling|seltzer|carbonated|fizzy|tonic|energy drink/, "limit", "carbonated drinks are often restricted"],
+      [/coffee|espresso|\btea\b|\bwater\b|broth|stock/, "ok", "plain drinks and broth are allowed"],
+      // refined grains
+      [/\bbread,? (sourdough|white|french|italian)\b|(sourdough|white|french|italian) bread|sourdough|baguette|ciabatta|rice (noodles?|cakes?|flour|crackers?|paper|vermicelli)|(white|jasmine|basmati|sushi|arborio) rice|rice,? (white|jasmine|basmati)|\brice\b|jasmine|basmati|white flour|corn ?flour|cornstarch|tapioca|arrowroot/, "ok", "refined white grains are allowed"],
+      [/pasta|spaghetti|macaroni|noodles?|couscous|bagel|croissant|\bbread\b|tortilla|crackers?|cereal|flour|wheat|\bcorn\b|polenta|popcorn/, "limit", "refined wheat and corn aren't named in the core list; white bread is allowed, whole grains aren't"],
+      // protein
+      [/chicken|turkey|beef|steak|\bpork\b|\blamb\b|veal|venison|duck|\bham\b|bacon|\beggs?\b|\bfish\b|salmon|tuna|\bcod\b|shrimp|prawns?|crab|lobster|sardines?|trout|tilapia|halibut|scallops?|mussels?|clams?|oysters?|anchov|mackerel|haddock|seafood|\bmeat\b|mince|jerky|bison/, "ok", "meat, fish and eggs are allowed"],
+      [/\bsalt\b|black pepper|\bspices?\b|cumin|turmeric|paprika|cinnamon|vinegar|mustard|vanilla|cocoa|chocolate/, "ok", "seasonings"],
+    ],
+  };
+
+  return { INTAKE_GROUPS, INTAKE, LABS, FEATURES, DRIVERS, PROTOCOLS, LENSES, EXPERTS, GROUPS, LFD };
 })();

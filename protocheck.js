@@ -6,6 +6,7 @@
 const HERBAL = /berberine|oregano|neem|allicin|allimed|candibactin|dysbiocide|fc-cidal|atrantil|biocidin|monolaurin|garlic/i;
 const RX_ANTI = /rifaximin|xifaxan|neomycin|metronidazole|flagyl/i;
 const ELEMENTAL = /elemental|physicians'? elemental|mbiota|absorb plus/i;
+const LOWFERM = /low.?ferment|cedars|pimentel diet/i;
 const RESTRICT = /fodmap|sibo diet|specific food|bi-?phasic|\bscd\b|specific carbohydrate|fast tract|low.?sulfur|low.?histamine|carnivore|gaps/i;
 const BISMUTH = /bismuth|pepto/i;
 
@@ -74,6 +75,18 @@ function protocolCheck(p) {
   shifts.forEach(x => facts.push([x.diff < 0 ? "Better" : "Worse", `${x.name}: ${r1(x.before)} → ${r1(x.now)}`]));
   const cb = constipationRate(addDays(p.start, -14), addDays(p.start, -1)), cl = constipationRate(addDays(end, -13) > p.start ? addDays(end, -13) : p.start, end);
   if (cb != null && cl != null && Math.abs(cl - cb) >= 0.15) facts.push([cl < cb ? "Better" : "Worse", `Hard or missed BMs: ${Math.round(cb * 100)}% of days → ${Math.round(cl * 100)}%`]);
+  if (LOWFERM.test(txt) && st !== "planned") {
+    let n = 0, foods = 0, fit = 0, bad = 0; const avoided = {};
+    for (let d = p.start; d <= end; d = addDays(d, 1)) {
+      const c = dayLfd(S.days[d], map);
+      if (!c.n) continue;
+      n++; foods += c.n; fit += c.ok;
+      if (c.avoid) { bad++; c.avoidNames.forEach(x => { avoided[x] = (avoided[x] || 0) + 1; }); }
+    }
+    const top = Object.entries(avoided).sort((a, b) => b[1] - a[1]).slice(0, 3).map(x => x[0]);
+    if (n) facts.push(["Followed", `${Math.round(fit / foods * 100)}% of foods logged fit the Low Fermentation Diet; ${bad} of ${n} days had a food to avoid${top.length ? ` (${top.join(", ")})` : ""}`]);
+    if (n >= 5 && bad / n >= 0.3) add("warn", "Foods to avoid keep slipping in", `On ${bad} of ${n} logged days you ate something the diet avoids${top.length ? `, most often ${top.join(", ")}` : ""}. Until it's followed closely, the check can't tell whether the diet itself works.`, ["pimentel"]);
+  }
   const kb = completeBMs(addDays(p.start, -14), addDays(p.start, -1)), kl = completeBMs(addDays(end, -13) > p.start ? addDays(end, -13) : p.start, end);
   if (kb && kl && Math.abs(kl.perWeek - kb.perWeek) >= 1) facts.push([kl.perWeek > kb.perWeek ? "Better" : "Worse", `Complete BMs: ${r1(kb.perWeek)} a week → ${r1(kl.perWeek)}`]);
   const bc = breathShift(p, "ch4"), bh = breathShift(p, "h2");

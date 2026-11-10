@@ -28,6 +28,8 @@ function reportDayLines(date, map) {
   for (const m of ms) L.push(`- ${MEAL_ONE[m.type]}${m.time ? ` ${m.time}` : ""}: ${foods(mealFoods(d, m.id)) || "(no foods listed)"}`);
   const loose = d.items.filter(e => !e.mid && map[e.id] && map[e.id].cat === "food");
   if (loose.length) L.push(`- Food, no meal given: ${loose.map(e => map[e.id].name + amount(e, map[e.id]) + (e.time ? ` at ${e.time}` : "")).join(", ")}`);
+  const lf = dayLfd(d, map);
+  if (lf.avoid || lf.limit) L.push(`- Low Fermentation Diet: ${[lf.avoidNames.length ? `avoid: ${[...new Set(lf.avoidNames)].join(", ")}` : "", lf.limitNames.length ? `limit: ${[...new Set(lf.limitNames)].join(", ")}` : ""].filter(Boolean).join("; ")} (everything else fits or isn't rated)`);
   if (gaps.length || night != null) L.push(`- Meal timing: ${[gaps.length ? `gaps ${gaps.map(fmtGap).join(", ")}` : "", night != null ? `overnight fast ${fmtGap(night)}` : ""].filter(Boolean).join("; ")}`);
   const x = dayNutrition(d, map);
   if (x.ok) L.push(`- Nutrition (${Math.round(x.cover * 100)}% of foods measured): ${fmtN(x.tot.kcal)} kcal, protein ${fmtN(x.tot.p)} g, fat ${fmtN(x.tot.f)} g, carbs ${fmtN(x.tot.c)} g, fiber ${fmtN(x.tot.fib)} g`);
@@ -117,6 +119,7 @@ function reportBrief(P, T, ppm) {
   P("- **Day score:** my overall gut-day rating (0 best, 10 worst), or the average of my 3 worst symptoms if I didn't rate the day.");
   P("- **Protocol check:** compares the 2 weeks before a protocol with its latest week. Improved = day score down 1.5+; worse = up 1.5+ in the first 2 weeks; no clear change = within 1 point after 10+ days; came back = improved, then back near the starting level within 60 days of stopping. Adherence under 60% means the result can't be trusted. It also checks the protocol matches my gas type, its length, prokinetic follow-up, and timing for a retest.");
   P("- **Food and supplement effects:** compare a day (and the next 1-2 days) with the 2 weeks around it, so slow trends aren't mistaken for food reactions.");
+  P(`- **Low Fermentation Diet ratings:** every food is rated fits, limit or avoid against Dr. Pimentel's Low Fermentation Diet (Cedars-Sinai). Avoid: beans and legumes, whole grains and oats, added fiber, cruciferous vegetables, lactose dairy, sugar alcohols and sucralose, xanthan/arabic/carrageenan gums. Limit: higher-fructose fruit, nuts and seeds, garlic and onion (guides disagree), soft cheese, alcohol, fizzy drinks, fermented foods. Packaged foods are rated from their ingredient list. The daily log names only foods to limit or avoid.`);
   P("- **Complete BMs per week:** bowel movements that felt fully emptied, without an enema. This is the main measure in constipation trials; 3+ a week is a common target.");
   H(3, "Approaches (lenses) used to label each expert");
   LENSES.forEach(([l, t]) => P(`- **${l}:** ${t}.`));
@@ -170,6 +173,7 @@ function reportBrief(P, T, ppm) {
     ["Bristol stool type", "1-7: 1-2 hard (constipated), 3-4 ideal, 5-7 loose."],
     ["BM size", "by volume; a cup is about the size of a fist."],
     ["Felt complete", "whether a BM felt fully emptied: yes, partly or no."],
+    ["Low Fermentation Diet", "Dr. Pimentel's (Cedars-Sinai) diet that cuts the foods gut bacteria ferment most; foods are rated fits, limit or avoid."],
     ["Breath readings", `${ppm ? "ppm from a breath test" : "FoodMarble home device levels, 0-10"}. The app treats H2 ≥ ${T.h2} and CH4 ≥ ${T.ch4} as elevated.`],
     ["Adherence", "share of days every item in a protocol was ticked off."],
     ["Times", "24-hour clock."],
@@ -200,6 +204,10 @@ function buildReport(range) {
   const hardNow = constipationRate(addDays(t0, -13), t0);
   const cNow = completeBMs(addDays(t0, -13), t0), cPrev = completeBMs(addDays(t0, -27), addDays(t0, -14));
   if (hardNow != null || cNow) P(`- **Bowel movements lately:** ${[hardNow != null ? `hard stools or no BM on ${Math.round(hardNow * 100)}% of logged days` : "", cNow ? `${r1(cNow.perWeek)} complete BMs a week (felt fully emptied, no enema)${cPrev ? `, compared with ${r1(cPrev.perWeek)} the 2 weeks before` : ""}` : ""].filter(Boolean).join("; ")}`);
+  { let n = 0, ok = 0; const av = {};
+    for (let i = 0; i < 14; i++) { const c = dayLfd(S.days[addDays(t0, -i)], map); n += c.n; ok += c.ok; c.avoidNames.forEach(x => { av[x] = (av[x] || 0) + 1; }); }
+    const top = Object.entries(av).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k} (${v} day${v > 1 ? "s" : ""})`);
+    if (n) P(`- **Low Fermentation Diet, last 14 days:** ${Math.round(ok / n * 100)}% of foods logged fit${top.length ? `; foods to avoid eaten: ${top.join(", ")}` : "; no foods to avoid"}`); }
   const current = S.profile.protocols.filter(p => p.start && ["active", "planned"].includes(protoStatus(p))).sort((a, b) => a.start.localeCompare(b.start));
   if (current.length) current.forEach(p => { const c = checkOf.get(p.id); P(`- **${protoStatus(p) === "planned" ? "Planned" : "Current"} protocol:** ${p.name}, ${protoStatus(p) === "planned" ? `starts ${p.start}` : `day ${c.days} (started ${p.start})`}. App's check: ${c.verdict.title}.`); });
   else P("- **Current protocols:** none running.");

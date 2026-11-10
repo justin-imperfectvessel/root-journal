@@ -216,7 +216,8 @@ function foodSummaryHtml(d) {
       <span class="nut-main"><span class="nut-kcal"><b>${fmtN(x.tot.kcal)}</b> ${T.kcal ? `of ${fmtN(T.kcal)} kcal` : "kcal"}</span>
       <span class="nut-bars">${["p", "f", "c", "fib"].map(k => nutBar(k, x.tot[k], T[k], { compact: true })).join("")}</span></span>${icon("chevR", "chev")}</button>` +
     (missing ? `<button type="button" class="row action nut-missing" data-act="foodFixNext">${icon("plus", "lead")}<span class="row-label">${missing} food${missing > 1 ? "s need" : " needs"} nutrition</span></button>` : "") +
-    (!T.kcal ? `<button type="button" class="row action" data-act="push" data-k="nutrition">${icon("plus", "lead")}<span class="row-label">Set your targets</span></button>` : "");
+    (!T.kcal ? `<button type="button" class="row action" data-act="push" data-k="nutrition">${icon("plus", "lead")}<span class="row-label">Set your targets</span></button>` : "") +
+    lfdDayRow(d);
 }
 function foodLogHtml(d) {
   const map = lib(), on = (d.items || []).filter(e => map[e.id] && map[e.id].cat === "food" && !e.mid);
@@ -228,7 +229,7 @@ function foodLogHtml(d) {
     const rows = es.map(e => {
       const it = map[e.id], { q, u } = entryQU(e, it), n = nutOf(it, q, u, map);
       return `<button type="button" class="row nav food-row" data-act="foodEdit" data-id="${e.id}"><span class="row-main"><span class="row-label">${esc(it.name)}</span>
-        <span class="row-sub">${n ? `${esc(fmtQU(q, u))} · ${fmtN(n.kcal)} kcal · ${fmtN(n.p)} g protein` : "Add nutrition"}${e.time ? ` · ${esc(fmtTime(e.time))}` : ""} · tap to put in a meal</span></span>${icon("chevR", "chev")}</button>`;
+        <span class="row-sub">${lfdLead(it, map)}${n ? `${esc(fmtQU(q, u))} · ${fmtN(n.kcal)} kcal · ${fmtN(n.p)} g protein` : "Add nutrition"}${e.time ? ` · ${esc(fmtTime(e.time))}` : ""} · tap to put in a meal</span></span>${icon("chevR", "chev")}</button>`;
     }).join("");
     return rows;
   }).join("");
@@ -257,21 +258,22 @@ function foodResultsHtml(s) {
   const q = (s.q || "").trim(), ql = q.toLowerCase();
   const mine = q ? S.profile.library.filter(i => i.cat === "food" && !i.hidden && i.name.toLowerCase().includes(ql) && i.id !== s.link).slice(0, 6) : [];
   let h = "";
-  if (mine.length && !s.link) h += `<h3 class="sheet-h3">Your foods</h3><div class="list">${mine.map(i => `<button type="button" class="row nav" data-act="fsLib" data-id="${i.id}"><span class="row-main"><span class="row-label">${esc(i.name)}</span><span class="row-sub">${hasNutrition(i) ? esc(fmtQU(usualOf(i).q, usualOf(i).u)) : "No nutrition yet"}</span></span>${icon("plus", "chev")}</button>`).join("")}</div>`;
+  if (mine.length && !s.link) h += `<h3 class="sheet-h3">Your foods</h3><div class="list">${mine.map(i => `<button type="button" class="row nav" data-act="fsLib" data-id="${i.id}"><span class="row-main"><span class="row-label">${esc(i.name)}</span><span class="row-sub">${lfdLead(i)}${hasNutrition(i) ? esc(fmtQU(usualOf(i).q, usualOf(i).u)) : "No nutrition yet"}</span></span>${icon("plus", "chev")}</button>`).join("")}</div>`;
   if (!Foods.data) h += `<div class="list"><div class="row"><span class="row-sub">${Foods.failed ? "Couldn't load the food database. Check your connection and try again; after one load it works offline." : "Loading the food database…"}</span></div></div>`;
   else if (q.length >= 2) {
     s.results = Foods.search(q);
-    h += `<h3 class="sheet-h3">USDA foods</h3><div class="list">${s.results.length ? s.results.map((f, i) => `<button type="button" class="row nav" data-act="fsPick" data-i="${i}"><span class="row-main"><span class="row-label">${esc(f.name)}</span><span class="row-sub">${f.portions[0] ? `${esc(f.portions[0][0])} · ${fmtN(f.nut.kcal * f.portions[0][1] / 100)} kcal` : `100 g · ${fmtN(f.nut.kcal)} kcal`}</span></span>${icon("chevR", "chev")}</button>`).join("")
+    h += `<h3 class="sheet-h3">USDA foods</h3><div class="list">${s.results.length ? s.results.map((f, i) => `<button type="button" class="row nav" data-act="fsPick" data-i="${i}"><span class="row-main"><span class="row-label">${esc(f.name)}</span><span class="row-sub">${lfdBadge(lfdText(f.name).r)} · ${f.portions[0] ? `${esc(f.portions[0][0])} · ${fmtN(f.nut.kcal * f.portions[0][1] / 100)} kcal` : `100 g · ${fmtN(f.nut.kcal)} kcal`}</span></span>${icon("chevR", "chev")}</button>`).join("")
       : `<div class="row"><span class="row-sub">No match. Try a simpler word, like "bread" or "chicken".</span></div>`}</div>`;
   }
   if (q && !s.link) h += `<div class="list"><button type="button" class="row action" data-act="fsPlain">${icon("plus", "lead")}<span class="row-label">Add "${esc(q)}" without nutrition</span></button></div>`;
-  h += `<div class="list"><button type="button" class="row action" data-act="fsLabel">${icon("plus", "lead")}<span class="row-label">Enter from a food label</span></button></div>`;
+  h += `<div class="list"><button type="button" class="row action" data-act="fsScan">${icon("plus", "lead")}<span class="row-label">Scan a label or barcode</span></button><button type="button" class="row action" data-act="fsLabel">${icon("plus", "lead")}<span class="row-label">Enter nutrition from a food label</span></button></div>`;
   return h;
 }
 const hasNutrition = it => !!(it.nut || (it.parts && it.parts.length));
 
 function foodSheetParts(s) {
   if (s.k === "meal" || s.k === "mealFood") return mealSheetParts(s);
+  if (s.k === "foodSearch" && (s.step === "scan" || s.step === "scanned")) return scanSheetParts(s);
   const map = lib();
   if (s.k === "foodSearch" && s.step === "search") {
     const linkIt = s.link && map[s.link];
@@ -285,7 +287,7 @@ function foodSheetParts(s) {
     const linkIt = s.link && map[s.link];
     const name = s.name ?? (linkIt ? linkIt.name : s.q && s.q.trim().length >= 3 ? s.q.trim().replace(/^\w/, c => c.toUpperCase()) : f.name);
     return { title: linkIt ? "Add nutrition" : "Add food", submitLabel: linkIt ? "Save" : "Add",
-      body: `<p class="sheet-text"><button type="button" class="textbtn" data-act="fsBack">${icon("chevL")} Results</button> ${esc(f.name)}</p>
+      body: `<p class="sheet-text"><button type="button" class="textbtn" data-act="fsBack">${icon("chevL")} Results</button> ${esc(f.name)} · ${lfdBadge(lfdText(f.name).r)}</p>
         <div class="list">${linkIt ? "" : `<label class="row field-row stack" for="fn"><span class="row-label">Name in your journal</span><input id="fn" name="name" required value="${esc(name)}"></label>`}
         ${amountRows(portions, q, u)}${linkIt || s.fromMeal ? "" : mealSeg(s.meal || guessMealNow())}
         ${linkIt || s.fromMeal ? "" : `<label class="row field-row" for="ft"><span class="row-label">Time</span><input type="time" id="ft" name="time" value=""></label>`}</div>
@@ -311,7 +313,8 @@ function foodSheetParts(s) {
           ${mealSeg(entryMeal(e))}<label class="row field-row" for="ft"><span class="row-label">Time</span><input type="time" id="ft" name="time" value="${esc(e.time || "")}"></label></div>
         ${hasNutrition(it) ? `<div class="list">${previewHtml(it, q, u)}</div>` : ""}
         ${it.parts ? `<div class="list">${it.parts.map(p => map[p.id] ? `<div class="row"><span class="row-label">${esc(map[p.id].name)}</span><span class="row-value">${esc(fmtQU(p.q, p.u))}</span></div>` : "").join("")}</div>`
-          : `<div class="list"><button type="button" class="row action" data-act="fsLink" data-id="${it.id}">${icon(hasNutrition(it) ? "search" : "plus", "lead")}<span class="row-label">${hasNutrition(it) ? "Change nutrition match" : "Add nutrition"}</span></button></div>`}`,
+          : `<div class="list"><button type="button" class="row action" data-act="fsLink" data-id="${it.id}">${icon(hasNutrition(it) ? "search" : "plus", "lead")}<span class="row-label">${hasNutrition(it) ? "Change nutrition match" : "Add nutrition"}</span></button></div>`}
+        ${lfdPanel(it, map)}`,
       del: `<button type="button" class="btn destructive block" data-act="foodDel" data-id="${it.id}">Remove from this day</button>` };
   }
   if (s.k === "foodMeal") {
@@ -335,6 +338,7 @@ function submitFoodSheet(fd) {
   const s = UI.sheet, map = lib();
   if (s.k === "meal" || s.k === "mealFood") { submitMealSheet(fd); return; }
   const meal = fd.get("meal") || undefined, time = fd.get("time") || "";
+  if (s.k === "foodSearch" && s.step === "scanned") { submitScan(fd); return; }
   if (s.k === "foodSearch" && s.step === "pick") {
     const f = s.f, q = num(fd.get("q")) ?? 1, u = fd.get("u");
     const it = s.link ? map[s.link] : addLibraryItem(String(fd.get("name") || f.name), "food");

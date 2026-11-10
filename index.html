@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-11-08 16:34";</script>
+<script>window.APP_BUILD = "2026-11-10 13:12";</script>
 <title>Case File</title>
 <meta name="description" content="Build the case for your gut: a daily SIBO/IMO journal with experiments, breath tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -307,6 +307,10 @@ svg .bsdot.b1, svg .bsdot.b2 { fill: var(--ink); } svg .bsdot.b3, svg .bsdot.b4 
 .proto-head { gap: 10px; }
 .status { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: 3px 9px; border-radius: 999px; border: var(--line-thin) solid var(--ink); color: var(--ink); flex: none; }
 .status.active { background: var(--ink); color: var(--paper); }
+.lfd { font-weight: 700; white-space: nowrap; }
+.lfd-avoid { text-decoration: underline; text-underline-offset: 2px; }
+.lfd-day .row-label { font-size: 15px; font-weight: 600; }
+#sc-text { width: 100%; font: inherit; }
 .archive-h { margin-top: 28px; }
 .archive-h .count { font-size: 14px; font-weight: 600; color: var(--muted, var(--ink)); opacity: .7; }
 .group.archived .row-label.strong { font-weight: 600; }
@@ -548,6 +552,7 @@ input.filled { background: var(--pop) !important; border-radius: 6px; padding: 2
 <script src="protocheck.js"></script>
 <script src="nutrition.js"></script>
 <script src="meals.js"></script>
+<script src="foodcheck.js"></script>
 <script src="supplements.js"></script>
 <script src="report.js"></script>
 <script src="results.js"></script>

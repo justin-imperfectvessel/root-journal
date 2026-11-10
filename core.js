@@ -1,6 +1,6 @@
 /* Case File — core: helpers, state, storage, streaks, insight engine, sample data.
    Top-level declarations are shared with ui.js (classic scripts share one global scope). */
-const { INTAKE_GROUPS, INTAKE, LABS, FEATURES, DRIVERS, PROTOCOLS, LENSES, EXPERTS, GROUPS } = window.KB;
+const { INTAKE_GROUPS, INTAKE, LABS, FEATURES, DRIVERS, PROTOCOLS, LENSES, EXPERTS, GROUPS, LFD } = window.KB;
 const LABMAP = Object.fromEntries(LABS.map(l => [l.k, l]));
 const INTAKEMAP = Object.fromEntries(INTAKE.map(q => [q.k, q]));
 

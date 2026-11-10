@@ -88,6 +88,9 @@ function dayStats() {
     groupFoods[g] = S.profile.library.filter(i => i.cat === "food" && GROUPS[g].test(i.name) && onSets[i.id]).map(i => i.name);
   }
 
+  groupFx.lfd_avoid = effect(d => dayLfd(d, map).avoid > 0);
+  groupFoods.lfd_avoid = S.profile.library.filter(i => i.cat === "food" && onSets[i.id] && lfdOf(i, map).r === "avoid").map(i => i.name);
+
   // recent two weeks against the two before
   const vals = (a, b, f) => { const v = []; for (let d = a; d <= b; d = addDays(d, 1)) { const x = f(d); if (x != null) v.push(x); } return v; };
   const recentW = [addDays(t, -13), t], priorW = [addDays(t, -27), addDays(t, -14)];
@@ -155,6 +158,8 @@ const EXPERIMENTS = {
     notes: "Water, plain tea or black coffee between meals is fine. No snacks or sweet drinks between meals. Tick each item on the days you manage it." },
   early_dinner: { name: "Earlier last meal", kind: "lifestyle", days: 14, items: ["Last food 3+ hours before bed"],
     notes: "Finish eating at least 3 hours before bed, and keep the rest of your day as usual." },
+  low_fermentation: { name: "Low Fermentation Diet trial", kind: "diet", days: 28, items: ["Low-fermentation eating", "Meals 4+ hours apart"],
+    notes: "Eat foods marked ● (fits) and keep ◐ (limit) foods small. Skip ✕ foods: beans and lentils, whole grains and oats, added fiber, cruciferous vegetables, milk and yogurt, sugar alcohols and sucralose. Meat, fish, eggs, white rice, potatoes, most fruit and non-cruciferous vegetables are fine. Leave 4-5 hours between meals." },
   low_histamine: { name: "Low-histamine trial", kind: "diet", days: 14, items: ["Low-histamine eating"],
     notes: "Skip aged cheese, wine and beer, fermented foods, cured or smoked meats, leftovers over a day old, canned fish, spinach, tomato, avocado and chocolate. Fresh-cooked meat and fish, rice and most fresh vegetables are fine. Afterwards, bring foods back one at a time." },
   low_fodmap: { name: "Low-FODMAP phase", kind: "diet", days: 14, items: ["Low-FODMAP eating"],
@@ -219,6 +224,7 @@ function hasProkinetic(X, map, since) {
 
 // Which experts' work each insight draws on, shown on the insight page (ids from KB.EXPERTS).
 const INSIGHT_EXPERTS = {
+  "lfd-avoid": ["pimentel", "rezaie"],
   "methane-mismatch": ["pimentel", "siebecker", "jacobi"], "methane-dropping": ["jacobi"], "protocol-helped": ["pimentel", "siebecker"],
   relapse: ["pimentel", "siebecker"], grazing: ["pimentel", "nambudripad"], "late-eating": ["nambudripad"], histamine: ["weinstock"],
   fodmap: ["siebecker", "ruscio", "chutkan"], h2s: ["rezaie", "pimentel"], "not-the-bugs": ["sandberg_lewis", "ruscio"],
@@ -311,6 +317,17 @@ const RULES = [
       summary: `Days after eating past 9 pm run ${r1(fx.diff)} points worse.`,
       evidence: [["Journal", `Last food at 9 pm or later: ${fxText(fx)}`]],
       why: "The strongest cleaning waves run overnight. A late last meal shortens the fast, and for some people it shows up as a worse next day.", ask: [] };
+  },
+  function lfdAvoid(X) {
+    const fx = X.st.groupFx.lfd_avoid;
+    if (!fx || fx.diff < 0.8 || !fx.conf || fx.conf === "low") return null;
+    const running = S.profile.protocols.some(p => LOWFERM.test(p.name) && ["active", "planned"].includes(protoStatus(p)));
+    return { id: "lfd-avoid", kind: "act", conf: fx.conf, drivers: ["mmc_grazing"], test: running ? null : "low_fermentation",
+      title: "Foods the Low Fermentation Diet avoids line up with worse days",
+      summary: `Days with an "avoid" food score worse than days without.`,
+      evidence: [["Journal", `Days with a food to avoid (${X.st.groupFoods.lfd_avoid.slice(0, 4).join(", ") || "several foods"}): ${fxText(fx)}`]],
+      why: "The Low Fermentation Diet (Dr. Pimentel, Cedars-Sinai) cuts the foods gut bacteria ferment most: beans, whole grains and added fiber, cruciferous vegetables, lactose, sugar alcohols and some gums. If your worse days follow those foods, a trial of the diet is a direct test.",
+      ask: ["Would a Low Fermentation Diet trial make sense alongside my current plan?"] };
   },
   function histamine(X) {
     const fx = X.st.groupFx.histamine, { F } = X;
