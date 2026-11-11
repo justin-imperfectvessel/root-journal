@@ -122,20 +122,83 @@ async function photoCanvas(file, max, gray) {
     return c;
   } finally { URL.revokeObjectURL(url); }
 }
-async function ocrPhoto(file, progress) {
+// read a photo once per variant ([max size, grayscale]); one reader serves every pass
+async function ocrTexts(file, variants, progress) {
   const T = await loadLib(OCR_LIB, "Tesseract");
-  const canvas = await photoCanvas(file, 2200, true);
-  const worker = await T.createWorker("eng", 1, { logger: m => { if (m.status === "recognizing text" && progress) progress(Math.round(m.progress * 100)); } });
-  try { return (await worker.recognize(canvas)).data.text || ""; } finally { worker.terminate(); }
+  let pass = 0;
+  const worker = await T.createWorker("eng", 1, { logger: m => { if (m.status === "recognizing text" && progress) progress(Math.round((pass + m.progress) / variants.length * 100)); } });
+  try {
+    const out = [];
+    for (; pass < variants.length; pass++) out.push((await worker.recognize(await photoCanvas(file, ...variants[pass]))).data.text || "");
+    return out;
+  } finally { worker.terminate(); }
 }
-// pull the ingredients list out of whatever the photo caught
+const ocrPhoto = async (file, progress) => (await ocrTexts(file, [[2200, true]], progress))[0];
+// pull the ingredients list out of whatever the photo caught (stops at the French list on Canadian labels)
 function ingredientsFrom(text) {
-  let t = String(text || "").replace(/\r/g, "").replace(/-\n(?=[a-z])/g, "").replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+  let t = String(text || "").replace(/\r/g, "").replace(/[|{}\[\]~«»_]/g, " ").replace(/-\n(?=[a-z])/g, "").replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
   const m = t.match(/ingr[eé]dients?\s*[:;.\-]?\s*/i);
   if (m) t = t.slice(m.index + m[0].length);
-  const end = t.search(/\b(contains|may contain|allergen|allergy advice|nutrition facts|nutrition information|storage|best before|distributed by|manufactured)\b/i);
+  const end = t.search(/\bingr[eé]dients?\s*[:;]|\b(contains|may contain|contient|peut contenir|allergen|allergy advice|nutrition facts|valeur nutritive|nutrition information|storage|best before|meilleur avant|distributed by|manufactured|product of|produit de)\b/i);
   if (end > 20) t = t.slice(0, end);
-  return t.replace(/[.\s]+$/, "").trim();
+  return t.replace(/[.\s,;:]+$/, "").replace(/\s+([,.;])/g, "$1").trim();
+}
+// read a Nutrition Facts table (Canadian bilingual or US). Values are per serving, as printed.
+const LAB_FIELDS = [ // key, label, unit, pattern for the row, rows to skip
+  ["kcal", "Calories", "kcal", /\bcalori\w*|\benergy\b/i],
+  ["f", "Fat", "g", /\b(total\s+)?fat\b|lipides/i, /satur|trans/i],
+  ["sat", "Saturated fat", "g", /satur/i],
+  ["c", "Carbs", "g", /carbo|glucides/i],
+  ["fib", "Fibre", "g", /fib(re|er)s?\b/i],
+  ["sug", "Sugars", "g", /sugars?\b|sucres/i, /added|ajout/i],
+  ["p", "Protein", "g", /protein|prot[eé]ines?/i],
+  ["ca", "Calcium", "mg", /calcium/i],
+  ["fe", "Iron", "mg", /\biron\b|\bfer\b/i],
+  ["mg", "Magnesium", "mg", /magn[eé]sium/i],
+  ["zn", "Zinc", "mg", /\bzinc\b/i],
+];
+const labNum = s => { s = s.replace(/[Oo]/g, "0").replace(",", "."); return /^0\d$/.test(s) ? Number("0." + s[1]) : Number(s); }; // "02" is a lost decimal point: 0.2
+function nutritionFrom(text) {
+  const lines = String(text || "").replace(/\r/g, "").split("\n").map(l => l.replace(/[|{}\[\]~«»_]/g, " ").replace(/\s{2,}/g, " ").trim()).filter(Boolean);
+  const vals = {};
+  for (const [k, , unit, re, skip] of LAB_FIELDS) {
+    for (const l of lines) {
+      const m = l.match(re);
+      if (!m || (skip && skip.test(l)) || vals[k] != null) continue;
+      const rest = l.slice(m.index + m[0].length);
+      if (k === "kcal") { const v = rest.match(/(\d{1,4})/); if (v) vals.kcal = Number(v[1]); continue; }
+      // a number with a unit; OCR often reads "g" as "q" or "9", and "0" as "O"
+      const v = rest.match(/(?:^|[^\d.%])([\dOo]{1,4}(?:[.,]\d{1,2})?)\s?(mg|mcg|µg|g|q|9)(?![a-z%])/i);
+      if (!v) continue;
+      let n = labNum(v[1]); const u = v[2].toLowerCase();
+      if (!isFinite(n)) continue;
+      if (unit === "g" && u === "mg") n /= 1000;
+      if (unit === "mg" && /g|q|9/.test(u) && !/m/.test(u)) n *= 1000;
+      vals[k] = n;
+    }
+  }
+  let serv = null, g = null;
+  for (const re of [/\b(?:per|serving size|portion)\b\s*:?\s*(.*?)\s*\(\s*([\dOo]+(?:[.,]\d+)?)\s?(g|q|9|ml)\b/i, /\bpour\b\s*(.*?)\s*\(\s*([\dOo]+(?:[.,]\d+)?)\s?(g|q|9|ml)\b/i]) {
+    const m = lines.join("\n").match(re);
+    if (m) { serv = m[1].replace(/(\d)([a-z])/gi, "$1 $2").replace(/^[^\da-z]+|[^\da-z)]+$/gi, "").trim() || null; g = labNum(m[2]); break; }
+  }
+  return { serv, g, vals, n: Object.keys(vals).length };
+}
+// merge several reads of the same table: the first read wins, the others fill gaps
+function mergeNutrition(...reads) {
+  const out = { serv: null, g: null, vals: {} };
+  for (const r of reads) { out.serv ??= r.serv; out.g ??= r.g; for (const k in r.vals) out.vals[k] ??= r.vals[k]; }
+  out.n = Object.keys(out.vals).length;
+  return out;
+}
+// colour and grayscale each catch rows the other misses
+const ocrNutrition = async (file, progress) => mergeNutrition(...(await ocrTexts(file, [[2200, false], [2200, true]], progress)).map(nutritionFrom));
+// a quick sense check: calories from the macros should land near the printed calories
+function labCheck(v) {
+  if (!v || !v.kcal) return "";
+  const est = 4 * (v.c || 0) + 4 * (v.p || 0) + 9 * (v.f || 0);
+  if (Math.abs(est - v.kcal) <= Math.max(10, v.kcal * 0.3)) return "";
+  return `The numbers don't quite add up (fat, carbs and protein make about ${fmtN(est)} kcal, not ${fmtN(v.kcal)}). Check them against the label.`;
 }
 async function readBarcode(file) {
   const canvas = await photoCanvas(file, 1600, false);
@@ -181,57 +244,103 @@ async function lookupBarcode(code) {
 }
 
 // the scan sheet (a step of the food search sheet, so it works from a meal too)
+const scanStatusHtml = s => s.status ? `<div class="list"><div class="row"><span class="row-sub">${s.busy ? `<span class="spinner"></span> ` : ""}${esc(s.status)}</span></div></div>` : "";
+const photoRow = (kind, label, sub) => `<label class="row action" for="sc-${kind}">${icon("plus", "lead")}<span class="row-main"><span class="row-label">${label}</span>${sub ? `<span class="row-sub">${sub}</span>` : ""}</span><input type="file" id="sc-${kind}" class="sr" accept="image/*" data-scan="${kind}"></label>`;
+const servLabel = serv => { serv = String(serv || "").trim() || "serving"; return /^[\d½¼¾]/.test(serv) ? serv : `1 ${serv}`; };
+function labRows(lab) {
+  const v = lab.vals || {}, fld = ([k, label, unit]) => `<label class="row field-row" for="lb-${k}"><span class="row-label">${label}</span><span class="field-end"><input type="number" id="lb-${k}" name="lb_${k}" data-lab="${k}" min="0" step="any" inputmode="decimal" ${k === "kcal" ? "required" : ""} value="${v[k] ?? ""}" placeholder="–"><span class="unit">${unit}</span></span></label>`;
+  return `<div class="list"><label class="row field-row stack" for="lb-serv"><span class="row-label">Per</span><input id="lb-serv" name="lb_serv" data-lab="serv" value="${esc(lab.serv || "")}" placeholder="e.g. 2 crackers, 1 cup"></label>
+      <label class="row field-row" for="lb-g"><span class="row-label">Weighs</span><span class="field-end"><input type="number" id="lb-g" name="lb_g" data-lab="g" min="0" step="any" inputmode="decimal" value="${lab.g ?? ""}" placeholder="–"><span class="unit">g</span></span></label></div>
+    <div class="list">${LAB_FIELDS.map(fld).join("")}</div>
+    <p class="footnote" id="lb-check">${esc(labCheck(v))}</p>
+    <div class="list"><label class="row field-row" for="lb-q"><span class="row-label">Servings eaten</span><input type="number" id="lb-q" name="q" value="${lab.q ?? 1}" min="0" step="any" inputmode="decimal"></label></div>`;
+}
 function scanSheetParts(s) {
   if (s.step === "scan") {
     return { title: "Scan a label", form: false,
-      body: `<p class="sheet-text"><button type="button" class="textbtn" data-act="fsBack">${icon("chevL")} Search</button> Photograph the ingredients list, or the barcode.</p>
+      body: `<p class="sheet-text"><button type="button" class="textbtn" data-act="fsBack">${icon("chevL")} Search</button> Photograph the ingredients, the nutrition facts, or the barcode. You can add the other photo next.</p>
         <div class="list">
-          <label class="row action" for="sc-ing">${icon("plus", "lead")}<span class="row-main"><span class="row-label">Photo of the ingredients</span><span class="row-sub">Read on this phone; the photo isn't kept or sent. The reader downloads once (a few MB), then works offline.</span></span><input type="file" id="sc-ing" class="sr" accept="image/*" data-scan="ing"></label>
-          <label class="row action" for="sc-bar">${icon("plus", "lead")}<span class="row-main"><span class="row-label">Photo of the barcode</span><span class="row-sub">Looks the product up in Open Food Facts, a free public database. Only the barcode number is sent.</span></span><input type="file" id="sc-bar" class="sr" accept="image/*" data-scan="bar"></label>
-          <button type="button" class="row action" data-act="scanType">${icon("plus", "lead")}<span class="row-label">Type or paste the ingredients</span></button>
+          ${photoRow("ing", "Photo of the ingredients", "Read on this phone; the photo isn't kept or sent. The reader downloads once (a few MB), then works offline.")}
+          ${photoRow("nut", "Photo of the nutrition facts", "Also read on this phone. Get the whole table in, flat and in good light.")}
+          ${photoRow("bar", "Photo of the barcode", "Looks the product up in Open Food Facts, a free public database. Only the barcode number is sent.")}
+          <button type="button" class="row action" data-act="scanType">${icon("plus", "lead")}<span class="row-label">Type it in</span></button>
         </div>
-        <div id="scan-status">${s.status ? `<div class="list"><div class="row"><span class="row-sub">${s.busy ? `<span class="spinner"></span> ` : ""}${esc(s.status)}</span></div></div>` : ""}</div>` };
+        <div id="scan-status">${scanStatusHtml(s)}</div>` };
   }
-  const f = s.found || {}, x = lfdText(f.ingredients || "");
-  const portions = f.nut ? [...(f.portions || []), ["g", 1]] : null, u = portions ? (f.portions && f.portions[0] ? f.portions[0][0] : "g") : null, q = u === "g" ? 100 : 1;
+  const f = s.found || {}, x = lfdText(f.ingredients || ""), lab = f.lab;
+  const off = !lab && f.nut, portions = off ? [...(f.portions || []), ["g", 1]] : null, u = portions ? (f.portions && f.portions[0] ? f.portions[0][0] : "g") : null, q = u === "g" ? 100 : 1;
+  const st = kind => `<div id="scan-status-${kind}">${s.statusKind === kind ? scanStatusHtml(s) : ""}</div>`;
   return { title: "Check a label", submitLabel: s.link ? "Save" : "Add",
-    body: `<p class="sheet-text"><button type="button" class="textbtn" data-act="scanAgain">${icon("chevL")} Scan again</button>${f.code ? ` Barcode ${esc(f.code)}` : ""}</p>
-      <div class="list">${s.link ? "" : `<label class="row field-row stack" for="sc-name"><span class="row-label">Name</span><input id="sc-name" name="name" required value="${esc(f.name || s.q || "")}" placeholder="e.g. Rice crackers"></label>`}
-        <label class="row field-row stack" for="sc-text"><span class="row-label">Ingredients</span><textarea id="sc-text" name="ing" rows="5" placeholder="Water, rice flour, salt…">${esc(f.ingredients || "")}</textarea></label></div>
-      <p class="footnote">${f.code && (f.ingredients || "").split(/[,;]/).filter(x => x.trim()).length < 4 ? "<b>This list looks short.</b> Open Food Facts entries are added by volunteers and some are incomplete. Check it against the pack, or go back and photograph the ingredients. " : ""}Fix anything that's wrong. The check below updates as you type.</p>
+    body: `<p class="sheet-text"><button type="button" class="textbtn" data-act="scanAgain">${icon("chevL")} Start over</button>${f.code ? ` Barcode ${esc(f.code)}` : ""}</p>
+      <div class="list">${s.link ? "" : `<label class="row field-row stack" for="sc-name"><span class="row-label">Name</span><input id="sc-name" name="name" required value="${esc(f.name || s.q || "")}" placeholder="e.g. Rice rusks"></label>`}</div>
+      <h3 class="sheet-h3">Ingredients</h3>
+      <div class="list"><label class="row field-row stack" for="sc-text"><span class="row-label">As printed</span><textarea id="sc-text" name="ing" rows="5" placeholder="Water, rice flour, salt…">${esc(f.ingredients || "")}</textarea></label>
+        ${photoRow("ing", f.ingredients ? "Read again from a photo" : "Add a photo of the ingredients")}</div>
+      ${st("ing")}
+      <p class="footnote">${f.code && (f.ingredients || "").split(/[,;]/).filter(x => x.trim()).length < 4 ? "<b>This list looks short.</b> Open Food Facts entries are added by volunteers and some are incomplete. Check it against the pack, or photograph the ingredients. " : ""}Fix anything that's wrong. The check below updates as you type.</p>
       <div id="sc-rate">${scanRateHtml(x)}</div>
-      ${f.nut ? `<div class="list">${amountRows(portions, q, u)}</div><p class="footnote">Nutrition from Open Food Facts (per 100 g: ${fmtN(f.nut.kcal)} kcal).</p>` : ""}
+      <h3 class="sheet-h3">Nutrition facts</h3>
+      ${lab ? labRows(lab) : off ? `<div class="list">${amountRows(portions, q, u)}</div><p class="footnote">From Open Food Facts (per 100 g: ${fmtN(f.nut.kcal)} kcal).</p>` : ""}
+      <div class="list">${photoRow("nut", lab ? "Read again from a photo" : off ? "Use a photo of the label instead" : "Add a photo of the nutrition facts")}
+        ${lab ? "" : `<button type="button" class="row action" data-act="scanNutType">${icon("plus", "lead")}<span class="row-label">Type the numbers</span></button>`}</div>
+      ${st("nut")}
+      ${lab ? `<p class="footnote">Read from your photo, per serving as printed. Check each number against the label before adding.</p>` : ""}
       ${s.link || s.fromMeal ? "" : `<div class="list">${mealSeg(s.meal || guessMealNow())}<label class="row field-row" for="ft"><span class="row-label">Time</span><input type="time" id="ft" name="time" value=""></label></div>`}` };
 }
 function scanRateHtml(x) {
   const bad = x.hits.filter(h => h.r !== "ok");
-  return `<h3 class="sheet-h3">Low Fermentation Diet</h3><div class="list"><div class="row"><span class="row-main"><span class="row-label">${lfdBadge(x.r)}</span>
+  return `<div class="list"><div class="row"><span class="row-main"><span class="row-label">Low Fermentation Diet: ${lfdBadge(x.r)}</span>
     <span class="row-sub">${bad.length ? bad.map(h => `${LFD_MARK[h.r]} <b>${esc(h.term)}</b>: ${esc(h.why)}`).join("<br>") : x.r === "ok" ? "Every ingredient it recognizes is on the allowed list." : "Nothing recognized yet."}</span></span></div></div>`;
+}
+// keep what's been typed on the check step before the sheet redraws
+function syncScanForm(s) {
+  const f = s.found ||= {}, name = $("#sc-name"), ing = $("#sc-text");
+  if (name) f.name = name.value;
+  if (ing) f.ingredients = ing.value;
+  if (f.lab) {
+    document.querySelectorAll("[data-lab]").forEach(el => {
+      const k = el.dataset.lab, v = el.value.trim();
+      if (k === "serv") f.lab.serv = v; else if (k === "g") f.lab.g = v === "" ? null : Number(v); else f.lab.vals[k] = v === "" ? null : Number(v);
+    });
+    const q = $("#lb-q"); if (q) f.lab.q = q.value;
+  }
 }
 async function handleScanFile(kind, file) {
   const s = UI.sheet;
-  if (!s || s.k !== "foodSearch" || s.step !== "scan" || !file) return;
-  const status = (msg, busy) => { s.status = msg; s.busy = busy; const el = $("#scan-status"); if (el && UI.sheet === s) el.innerHTML = msg ? `<div class="list"><div class="row"><span class="row-sub">${busy ? `<span class="spinner"></span> ` : ""}${esc(msg)}</span></div></div>` : ""; };
+  if (!s || s.k !== "foodSearch" || (s.step !== "scan" && s.step !== "scanned") || !file) return;
+  const onCheck = s.step === "scanned", step = s.step;
+  if (onCheck) syncScanForm(s);
+  const status = (msg, busy) => {
+    Object.assign(s, { status: msg, busy, statusKind: kind });
+    const el = $(onCheck ? `#scan-status-${kind}` : "#scan-status");
+    if (el && UI.sheet === s) { el.innerHTML = scanStatusHtml(s); if (msg) el.scrollIntoView({ block: "nearest" }); }
+  };
+  const done = found => { if (UI.sheet !== s || s.step !== step) return; Object.assign(s, { step: "scanned", found: { ...(s.found || {}), ...found }, status: "", busy: false }); renderSheet(); };
   try {
     if (kind === "ing") {
       status("Getting the reader ready…", true);
-      const text = await ocrPhoto(file, p => status(`Reading the label… ${p}%`, true));
+      const text = await ocrPhoto(file, p => status(`Reading the ingredients… ${p}%`, true));
+      if (!/ingr[eé]dients?/i.test(text) && /nutrition facts|valeur nutritive|calori|lipides|glucides/i.test(text)) { status("That looks like the nutrition facts. Use the nutrition facts photo for that one, and photograph the ingredients list here."); return; }
       const ingredients = ingredientsFrom(text);
-      if (!ingredients || ingredients.length < 4) { status("Couldn't make out any text. Try again closer, in good light, with the list flat and filling the photo."); return; }
-      Object.assign(s, { step: "scanned", found: { name: s.q || "", ingredients }, status: "", busy: false });
+      if (!ingredients || ingredients.length < 4) { status("Couldn't make out the list. Try again closer, in good light, with the list flat and filling the photo."); return; }
+      done({ name: (s.found && s.found.name) || s.q || "", ingredients });
+    } else if (kind === "nut") {
+      status("Getting the reader ready…", true);
+      const r = await ocrNutrition(file, p => status(`Reading the nutrition facts… ${p}%`, true));
+      if (r.vals.kcal == null && r.n < 2) { status("Couldn't find a Nutrition Facts table. Try again with the whole table in the photo, flat, in good light."); return; }
+      done({ lab: { serv: r.serv, g: r.g, vals: r.vals, q: 1 } });
     } else {
       status("Reading the barcode…", true);
       const code = await readBarcode(file);
-      if (!code) { status("Couldn't read the barcode. Try a sharper photo with the barcode filling most of it, or photograph the ingredients instead."); return; }
+      if (!code) { status("Couldn't read the barcode. Try a sharper photo with the barcode filling most of it, or photograph the label instead."); return; }
       status(`Barcode ${code}. Looking it up…`, true);
       const found = await lookupBarcode(code).catch(() => undefined);
-      if (found === undefined) { status("Couldn't reach Open Food Facts. Check your connection, or photograph the ingredients instead (that works offline)."); return; }
-      if (!found) { status(`Barcode ${code} isn't in Open Food Facts yet. Photograph the ingredients list instead.`); return; }
-      Object.assign(s, { step: "scanned", found, status: "", busy: false });
+      if (found === undefined) { status("Couldn't reach Open Food Facts. Check your connection, or photograph the label instead (that works offline)."); return; }
+      if (!found) { status(`Barcode ${code} isn't in Open Food Facts yet. Photograph the ingredients and nutrition facts instead.`); return; }
+      done(found);
     }
-    if (UI.sheet === s) renderSheet();
   } catch (e) {
-    status(String(e && e.message) === "offline" ? "The reader needs a connection the first time it's used. Try again when you're online." : "Something went wrong reading that photo. Try another photo, or type the ingredients.");
+    status(String(e && e.message) === "offline" ? "The reader needs a connection the first time it's used. Try again when you're online." : "Something went wrong reading that photo. Try another photo, or type it in.");
   }
 }
 function submitScan(fd) {
@@ -242,7 +351,14 @@ function submitScan(fd) {
   if (ingredients) it.ingredients = ingredients; else delete it.ingredients;
   if (f.code) it.barcode = f.code;
   let qu = null;
-  if (f.nut) {
+  if (f.lab) { // per serving as printed → per 100 g, the serving becomes the portion
+    const g = num(fd.get("lb_g")), label = servLabel(fd.get("lb_serv")), q = num(fd.get("q")) ?? 1;
+    const base = g || 100, nut = {};
+    NUT_KEYS.forEach(k => { nut[k] = (num(fd.get("lb_" + k)) || 0) * 100 / base; });
+    Object.assign(it, { nut, portions: [[label, base]], src: "label", usual: { q, u: label } });
+    delete it.fdc; delete it.usdaName;
+    qu = { q, u: label };
+  } else if (f.nut) {
     const q = num(fd.get("q")) ?? 1, u = fd.get("u") || "g";
     Object.assign(it, { nut: f.nut, portions: f.portions || [], src: "off", usual: { q, u } });
     delete it.fdc; delete it.usdaName;
@@ -260,7 +376,9 @@ document.addEventListener("change", e => {
   if (t && t.dataset && t.dataset.scan && t.files && t.files[0]) { const file = t.files[0]; t.value = ""; handleScanFile(t.dataset.scan, file); }
 });
 document.addEventListener("input", e => {
-  if (e.target && e.target.id === "sc-text") { const el = $("#sc-rate"); if (el) el.innerHTML = scanRateHtml(lfdText(e.target.value)); }
+  const t = e.target;
+  if (t && t.id === "sc-text") { const el = $("#sc-rate"); if (el) el.innerHTML = scanRateHtml(lfdText(t.value)); }
+  if (t && t.dataset && t.dataset.lab && UI.sheet && UI.sheet.found && UI.sheet.found.lab) { syncScanForm(UI.sheet); const el = $("#lb-check"); if (el) el.textContent = labCheck(UI.sheet.found.lab.vals); }
 });
 document.addEventListener("click", e => {
   const t = e.target.closest("[data-act]");
@@ -275,7 +393,8 @@ document.addEventListener("click", e => {
     }
     case "fsScan": if (s) { s.step = "scan"; s.status = ""; renderSheet(); } break;
     case "mlScan": if (s) mealSub({ k: "foodSearch", step: "scan", q: s.q, meal: s.draft.type, fromMeal: true }); break;
-    case "scanType": if (s) { Object.assign(s, { step: "scanned", found: { name: s.q || "", ingredients: "" } }); renderSheet(); const el = $("#sc-text"); if (el) el.focus(); } break;
+    case "scanType": if (s) { Object.assign(s, { step: "scanned", found: { name: s.q || "", ingredients: "" }, status: "" }); renderSheet(); const el = $("#sc-text"); if (el) el.focus(); } break;
+    case "scanNutType": if (s && s.found) { syncScanForm(s); s.found.lab = { serv: "", g: null, vals: {}, q: 1 }; s.status = ""; renderSheet(); const el = $("#lb-serv"); if (el) el.focus(); } break;
     case "scanAgain": if (s) { Object.assign(s, { step: "scan", found: null, status: "" }); renderSheet(); } break;
   }
 });

@@ -901,7 +901,8 @@ window.KB = (function () {
       [/lactose[- ]free|(almond|coconut|rice|macadamia|hemp|cashew) milk|milk,? (almond|coconut|rice|macadamia|hemp|cashew|lactose[- ]free)/, "ok", "lactose-free"],
       [/green beans?|string beans?|runner beans?|french beans?|bean sprouts|coffee beans?|vanilla beans?|cocoa beans?/, "ok", "not a legume"],
       [/partially hydrolyzed guar|\bphgg\b|sunfiber/, "limit", "a fiber supplement, though Pimentel's group has studied it alongside rifaximin"],
-      [/sweet potato|potato bread|potato starch|\bpotato(es)?\b|\byams?\b/, "ok", "potatoes are allowed"],
+      [/\b(olive|extra virgin olive|coconut|avocado|canola|sunflower|sunflower seed|sesame|grapeseed|vegetable|rapeseed|peanut|corn|soybean|soy|soya|safflower|palm|palm kernel|cottonseed|rice bran|walnut|almond|flax|flaxseed|hemp ?seed|pumpkin seed|mct) oils?\b/, "ok", "fats and oils are allowed"],
+      [/sweet potato|potato bread|potato (starch|flour|flakes)|\bpotato(es)?\b|\byams?\b/, "ok", "potatoes are allowed"],
       [/peanut butter|almond butter|nut butter|\bnuts?\b|almonds?|cashews?|pistachios?|walnuts?|pecans?|peanuts?|hazelnuts?|macadamias?|brazil nuts?|\bseeds?\b|chia|flax|tahini/, "limit", "nuts and seeds in small amounts"],
       [/\b(olive|coconut|avocado|canola|sunflower|sesame|grapeseed|vegetable|rapeseed|peanut|corn) oil\b|\boils?\b|\bghee\b|\bbutter\b|\blard\b|\btallow\b/, "ok", "fats and oils are allowed"],
       // whole grains and fiber
@@ -934,7 +935,7 @@ window.KB = (function () {
       [/\bsoda\b|\bcola\b|sparkling|seltzer|carbonated|fizzy|tonic|energy drink/, "limit", "carbonated drinks are often restricted"],
       [/coffee|espresso|\btea\b|\bwater\b|broth|stock/, "ok", "plain drinks and broth are allowed"],
       // refined grains
-      [/\bbread,? (sourdough|white|french|italian)\b|(sourdough|white|french|italian) bread|sourdough|baguette|ciabatta|rice (noodles?|cakes?|flour|crackers?|paper|vermicelli)|(white|jasmine|basmati|sushi|arborio) rice|rice,? (white|jasmine|basmati)|\brice\b|jasmine|basmati|white flour|corn ?flour|cornstarch|tapioca|arrowroot/, "ok", "refined white grains are allowed"],
+      [/\bbread,? (sourdough|white|french|italian)\b|(sourdough|white|french|italian) bread|sourdough|baguette|ciabatta|((white|jasmine|basmati|sushi|glutinous|sweet) )?rice (noodles?|cakes?|flour|starch|crackers?|paper|vermicelli|syrup)|(tapioca|cassava|arrowroot|corn) (flour|starch)|cassava|(white|jasmine|basmati|sushi|arborio) rice|rice,? (white|jasmine|basmati)|\brice\b|jasmine|basmati|white flour|corn ?flour|cornstarch|tapioca|arrowroot/, "ok", "refined white grains are allowed"],
       [/pasta|spaghetti|macaroni|noodles?|couscous|bagel|croissant|\bbread\b|tortilla|crackers?|cereal|flour|wheat|\bcorn\b|polenta|popcorn/, "limit", "refined wheat and corn aren't named in the core list; white bread is allowed, whole grains aren't"],
       // protein
       [/chicken|turkey|beef|steak|\bpork\b|\blamb\b|veal|venison|duck|\bham\b|bacon|\beggs?\b|\bfish\b|salmon|tuna|\bcod\b|shrimp|prawns?|crab|lobster|sardines?|trout|tilapia|halibut|scallops?|mussels?|clams?|oysters?|anchov|mackerel|haddock|seafood|\bmeat\b|mince|jerky|bison/, "ok", "meat, fish and eggs are allowed"],
