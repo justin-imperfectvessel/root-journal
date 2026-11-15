@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<script>window.APP_BUILD = "2026-11-10 21:44";</script>
+<script>window.APP_BUILD = "2026-11-15 11:18";</script>
 <title>Case File</title>
 <meta name="description" content="Build the case for your gut: a daily SIBO/IMO journal with experiments, breath tracking, protocol comparisons and a root-cause finder.">
 <meta name="theme-color" content="#FFFFFF">
@@ -384,6 +384,7 @@ svg .bsdot.b1, svg .bsdot.b2 { fill: var(--ink); } svg .bsdot.b3, svg .bsdot.b4 
 .gap-row.good span::after { content: " ✓"; }
 .meal-add { display: flex; flex-wrap: wrap; gap: 8px; }
 .meal-add .chip { min-height: 34px; padding: 5px 13px 5px 12px; }
+.meal-add .chip.again { border-style: dashed; }
 .meal-head { padding-top: 14px; padding-bottom: 4px; }
 .meal-head .row-label { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .meal-head .row-value { font-size: 13px; font-weight: 700; }
@@ -507,6 +508,9 @@ input.filled { background: var(--pop) !important; border-radius: 6px; padding: 2
 #toast { position: fixed; left: 50%; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px) + 14px); z-index: 50; transform: translateX(-50%); max-width: calc(100% - 36px); width: max-content;
   background: var(--ink); color: var(--paper); padding: 12px 20px; border-radius: 999px; font-size: 15px; font-weight: 600; }
 #toast.show { animation: toast .25s ease-out; }
+#toast.has-act { display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 18px; }
+.toast-act { flex: none; border: 0; background: var(--paper); color: var(--ink); border-radius: 999px; padding: 7px 14px; font: inherit; font-weight: 700; cursor: pointer; }
+#toast.has-act[hidden] { display: none; }
 #update-bar { position: fixed; left: 50%; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px) + 14px); z-index: 49; transform: translateX(-50%); width: max-content; max-width: calc(100% - 36px);
   display: flex; align-items: center; gap: 14px; background: var(--paper); color: var(--ink); border: var(--line) solid var(--ink); padding: 8px 10px 8px 18px; border-radius: 999px; font-size: 15px; font-weight: 600; }
 #update-bar .textbtn { background: var(--ink); color: var(--paper); border-radius: 999px; padding: 6px 14px; }

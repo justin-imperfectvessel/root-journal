@@ -203,10 +203,18 @@ const Store = {
   },
 };
 
-function toast(msg) {
+// act: { label, fn } adds a button (e.g. Undo) and keeps the toast up longer
+function toast(msg, act) {
   const t = $("#toast");
-  t.textContent = msg; t.hidden = false; t.classList.remove("show"); void t.offsetWidth; t.classList.add("show");
-  clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 3600);
+  t.textContent = msg; t.classList.toggle("has-act", !!act);
+  if (act) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "toast-act"; b.textContent = act.label;
+    b.onclick = () => { t.hidden = true; clearTimeout(toast.t); act.fn(); };
+    t.append(b);
+  }
+  t.hidden = false; t.classList.remove("show"); void t.offsetWidth; t.classList.add("show");
+  clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, act ? 7000 : 3600);
 }
 
 // ---------- analysis engine ----------

@@ -51,6 +51,71 @@ function mealFor(d, type, time = "") {
   return m;
 }
 
+// ---------- repeat meals ----------
+// past meals of a type, newest first, with exact repeats folded together (same foods, any amounts)
+function pastMeals(type, date, skipMid, days = 60) {
+  const map = lib(), seen = new Map();
+  for (let i = 0; i <= days; i++) {
+    const dt = addDays(date, -i), d = S.days[dt];
+    if (!d || !d.meals) continue;
+    for (const m of dayMeals(d).reverse()) {
+      if (m.type !== type || m.id === skipMid) continue;
+      const foods = mealFoods(d, m.id).filter(e => map[e.id]).map(e => ({ id: e.id, ...entryQU(e, map[e.id]) }));
+      if (!foods.length) continue;
+      const key = foods.map(f => f.id).sort().join("|");
+      const x = seen.get(key);
+      if (x) { x.count++; if (m.time) x.times.push(m.time); }
+      else seen.set(key, { key, date: dt, foods, count: 1, times: m.time ? [m.time] : [] });
+    }
+  }
+  return [...seen.values()];
+}
+// saved usual meals (made with "Save as a usual meal") for this type, or for any meal if untagged
+const savedMeals = type => S.profile.library.filter(i => i.parts && i.parts.length && !i.hidden && (!i.meal || i.meal === type));
+// the meal you keep having: eaten the same way at least twice in the last 30 days (most often, then most recent)
+function usualMeal(type, date) {
+  const r = pastMeals(type, date, null, 30).filter(x => x.count >= 2);
+  return r.sort((a, b) => b.count - a.count || b.date.localeCompare(a.date))[0] || null;
+}
+function mealSummary(foods, map = lib()) {
+  const n = zeroNut(); let measured = 0;
+  for (const f of foods) { const v = nutOf(map[f.id], f.q, f.u, map); if (v) { addNut(n, v); measured++; } }
+  return [measured ? `${fmtN(n.kcal)} kcal` : "", lfdCountText(lfdCount(foods.map(f => map[f.id]), map))].filter(Boolean).join(" · ");
+}
+const dayWord = (dt, from) => dt === from ? "Earlier today" : dt === addDays(from, -1) ? "Yesterday" : fmtDate(dt);
+function haveAgainHtml(s) {
+  const map = lib(), type = s.draft.type, rows = [];
+  for (const it of savedMeals(type).slice(0, 2)) rows.push([`saved:${it.id}`, it.name, it.parts]);
+  for (const x of pastMeals(type, s.date, s.mid).slice(0, 5 - rows.length))
+    rows.push([`past:${x.key}`, `${dayWord(x.date, s.date)}${x.count > 1 ? ` · had ${x.count} times` : ""}`, x.foods]);
+  if (!rows.length) return "";
+  s.again = Object.fromEntries(rows.map(([k, , foods]) => [k, foods]));
+  return `<div class="row"><span class="row-sub">Have a recent ${MEAL_ONE[type].toLowerCase()} again, or search below.</span></div>` +
+    rows.map(([k, label, foods]) => `<button type="button" class="row nav" data-act="mlAgain" data-k="${esc(k)}"><span class="row-main"><span class="row-label">${esc(label)}</span>
+      <span class="row-sub">${esc(foods.map(f => map[f.id] && map[f.id].name).filter(Boolean).join(", "))}<br>${esc(mealSummary(foods, map))}</span></span>${icon("plus", "chev")}</button>`).join("");
+}
+// log a meal in one tap, at the time you usually have it
+const midTime = a => { const b = a.slice().sort(); return b.length ? b[Math.floor((b.length - 1) / 2)] : ""; };
+function repeatMeal(type, date) {
+  const x = usualMeal(type, date);
+  if (!x) return;
+  const d = touchDay(date), now = new Date().toTimeString().slice(0, 5);
+  let time = midTime(x.times) || MEAL_TIME[type];
+  if (date === todayStr() && time > now) time = now;
+  const m = { id: newId(), type, time };
+  d.meals ||= []; d.meals.push(m);
+  for (const f of x.foods) d.items.push({ id: f.id, dose: "", time: "", q: f.q, u: f.u, meal: type, mid: m.id });
+  syncMealTiming(d);
+  haptic(); commitDay(date); render();
+  toast(`${MEAL_ONE[type]} logged at ${fmtTime(time)}`, {
+    label: "Undo", fn: () => {
+      const dd = touchDay(date);
+      dd.meals = (dd.meals || []).filter(y => y.id !== m.id);
+      dd.items = dd.items.filter(e => e.mid !== m.id);
+      syncMealTiming(dd); commitDay(date); render();
+    } });
+}
+
 // ---------- Today ----------
 function gapRow(h, kind) {
   const tag = kind === "night" ? (h >= 12 ? "good" : "short") : h >= 4 ? "good" : h < 3 ? "short" : "";
@@ -69,7 +134,10 @@ function mealsHtml(d, date) {
     if (m.time) prev = m;
   }
   const have = new Set(ms.map(m => m.type));
-  h += `<div class="row meal-add">${MEAL_TYPES.filter(k => k === "snack" || !have.has(k)).map(k => `<button type="button" class="chip" data-act="mealAdd" data-type="${k}">${icon("plus", "chk")}${MEAL_ONE[k]}</button>`).join("")}</div>`;
+  const open = MEAL_TYPES.filter(k => k === "snack" || !have.has(k));
+  const again = open.map(k => [k, usualMeal(k, date)]).filter(([, x]) => x);
+  h += `<div class="row meal-add">${open.map(k => `<button type="button" class="chip" data-act="mealAdd" data-type="${k}">${icon("plus", "chk")}${MEAL_ONE[k]}</button>`).join("")}
+    ${again.map(([k, x]) => `<button type="button" class="chip again" data-act="mealAgain" data-type="${k}" aria-label="Log ${MEAL_ONE[k].toLowerCase()} again: ${esc(x.foods.map(f => map[f.id] && map[f.id].name).filter(Boolean).join(", "))}">↻ ${MEAL_ONE[k]} again</button>`).join("")}</div>`;
   return h;
 }
 
@@ -91,7 +159,7 @@ function mealDraftNut(dr, map) {
 }
 function mealFoodsHtml(s) {
   const map = lib(), dr = s.draft;
-  if (!dr.foods.length) return `<div class="row"><span class="row-sub">Search below, or tap one of your usual foods.</span></div>`;
+  if (!dr.foods.length) return haveAgainHtml(s) || `<div class="row"><span class="row-sub">Search below, or tap one of your usual foods.</span></div>`;
   const { n, measured } = mealDraftNut(dr, map);
   return dr.foods.map((f, i) => {
     const it = map[f.id]; if (!it) return "";
@@ -196,6 +264,12 @@ document.addEventListener("click", e => {
   switch (t.dataset.act) {
     case "mealAdd": openMeal(UI.date, null, t.dataset.type); break;
     case "mealEdit": openMeal(UI.date, t.dataset.mid); break;
+    case "mealAgain": repeatMeal(t.dataset.type, UI.date); break;
+    case "mlAgain": {
+      const foods = s && s.again && s.again[t.dataset.k]; if (!foods) break;
+      s.draft.foods = foods.filter(f => map[f.id]).map(f => ({ id: f.id, q: f.q, u: f.u }));
+      haptic(); refreshMealResults(); break;
+    }
     case "mlAdd": {
       const it = map[t.dataset.id]; if (!it || !s) break;
       const i = s.draft.foods.findIndex(f => f.id === it.id);
